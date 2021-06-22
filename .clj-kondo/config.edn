@@ -1,0 +1,4 @@
+{:lint-as {daggerml.ui/defnative-element-factories    clojure.core/declare
+           daggerml.ui/deftag                         clojure.core/defn
+           daggerml.cells/defc                        clojure.core/def
+           daggerml.cells/defc=                       clojure.core/def}}

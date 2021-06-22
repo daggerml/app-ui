@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  foo-bar {
+    @apply w-1/2 m-4 px-4 py-2 bg-blue-100 rounded-xl border-4 border-black shadow-2xl;
+  }
+}

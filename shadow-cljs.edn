@@ -1,0 +1,28 @@
+;; shadow-cljs configuration
+{:source-paths
+ ["src"]
+
+ :dependencies
+ []
+
+ :dev-http
+ {8080 "public"}
+
+ :builds
+ {:app
+  {:target :browser
+   :output-dir "public/js"
+   :asset-path "/js"
+   :compiler-options {:source-map true}
+   :modules {:main {:init-fn daggerml.main/-main}}}
+
+  :browser-test
+  {:target :browser-test
+   :test-dir "test/js/"
+   :devtools {:http-port 8021
+              :http-root "test/js/"}}
+
+  :node-test
+  {:target :node-test
+   :output-to "test/node-tests.js"
+   :autorun true}}}
