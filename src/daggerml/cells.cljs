@@ -1,19 +1,21 @@
 (ns daggerml.cells
-  (:require-macros [daggerml.cells]))
+  (:require-macros [daggerml.cells :refer [with-let]]))
 
 (declare Cell cell?)
 
-(defn cell?     [x] (and (= (type x) Cell) x))
-(defn formula?  [x] (and (cell? x) (.-thunk ^Cell x) x))
-(defn lens?     [x] (and (cell? x) (.-setter ^Cell x) x))
-(defn input?    [x] (and (cell? x) (not (formula? x)) x))
+(defn safe-nth  [x i] (try (nth x i) (catch js/Error _)))
+(defn cell?     [x]   (and (= (type x) Cell) x))
+(defn formula?  [x]   (and (cell? x) (.-thunk ^Cell x) x))
+(defn lens?     [x]   (and (cell? x) (.-setter ^Cell x) x))
+(defn input?    [x]   (and (cell? x) (not (formula? x)) x))
+(defn deref*    [x]   (if (satisfies? cljs.core/IDeref x) @x x))
 
 (defn- update-state!
   [^Cell this new-state queue]
   (let [old-state (.-state this)]
     (when (not= new-state old-state)
       (set! (.-state this) new-state)
-      (-notify-watches this new-state old-state)
+      (-notify-watches this old-state new-state)
       (let [sinks (.-sinks this)]
         (dotimes [i (alength sinks)]
           (let [sink (aget sinks i)]
@@ -51,7 +53,8 @@
 
   cljs.core/IWatchable
   (-notify-watches [this old-val new-val]
-    (doseq [[key f] watches] (f key this old-val new-val)))
+    (doseq [[key f] watches]
+      (f key this old-val new-val)))
   (-add-watch [this k f]
     (set! (.-watches this) (assoc watches k f)))
   (-remove-watch [this k]
@@ -62,19 +65,26 @@
   (Cell. state (array) (array) nil {} nil))
 
 (defn formula
-  [sources thunk setter]
-  (let [this (cell (thunk))]
-    (set! (.-thunk this) thunk)
-    (set! (.-setter this) setter)
-    (doseq [src sources]
-      (when (cell? src) (.push (.-sinks ^Cell src) this)))
-    this))
+  ([sources thunk]
+   (formula sources thunk nil))
+  ([sources thunk setter]
+   (with-let [this (cell (thunk))]
+     (set! (.-thunk this) thunk)
+     (set! (.-setter this) setter)
+     (doseq [src sources]
+       (when (cell? src)
+         (.push (.-sinks ^Cell src) this))))))
 
 (defn do-watch
-  ([c f]
-   (do-watch c f nil))
-  ([c f init]
-   (let [key (js-obj)]
-     (add-watch c key #(f %3 %4))
-     (f @c init)
-     key)))
+  ([ref f]
+   (do-watch ref nil f))
+  ([ref init f]
+   (with-let [k (gensym)]
+     (add-watch ref k #(f %3 %4))
+     (f init @ref))))
+
+(defn cell-map
+  [f c]
+  (let [cseq (formula [c] #(seq @c))]
+    (->> (range 0 (count @cseq))
+         (map (fn [i] (formula [cseq] (fn [] (f (safe-nth @cseq i)))))))))

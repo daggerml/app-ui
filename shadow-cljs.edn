@@ -3,7 +3,7 @@
  ["src"]
 
  :dependencies
- []
+ [[garden "1.3.10"]]
 
  :dev-http
  {8080 "public"}
@@ -14,7 +14,7 @@
    :output-dir "public/js"
    :asset-path "/js"
    :compiler-options {:source-map true}
-   :modules {:main {:init-fn daggerml.main/-main}}}
+   :modules {:main {:init-fn daggerml.app.main/-main}}}
 
   :browser-test
   {:target :browser-test

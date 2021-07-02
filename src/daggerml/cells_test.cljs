@@ -71,16 +71,22 @@
       (is (= [101 102] @z)))))
 
 (deftest watches
-  (let [w (atom [])
-        x (cell 100)
-        y (cell= (+ 1 @x))
-        k (do-watch y #(swap! w conj [%1 %2]))]
+  (let [w   (atom [])
+        w'  (atom [])
+        x   (cell 100)
+        y   (cell= (+ 1 @x))
+        k   (do-watch y #(swap! w conj [%1 %2]))
+        k'  (do-watch y 100 #(swap! w' conj [%1 %2]))]
     (testing "watch fires once when added"
-      (is (= [[101 nil]] @w)))
+      (is (= [[nil 101]] @w))
+      (is (= [[100 101]] @w')))
     (testing "watch fires after each subsequent change"
       (swap! x inc)
-      (is (= [[101 nil] [102 101]] @w)))
+      (is (= [[nil 101] [101 102]] @w))
+      (is (= [[100 101] [101 102]] @w')))
     (testing "watch doesn't fire after removal"
       (remove-watch y k)
+      (remove-watch y k')
       (swap! x inc)
-      (is (= [[101 nil] [102 101]] @w)))))
+      (is (= [[nil 101] [101 102]] @w))
+      (is (= [[100 101] [101 102]] @w')))))

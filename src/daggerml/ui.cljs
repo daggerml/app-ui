@@ -1,30 +1,117 @@
 (ns daggerml.ui
-  (:refer-clojure :exclude [comment])
   (:require-macros
-    [daggerml.ui :refer [defnative-element-factories with-timeout]])
+    [daggerml.ui :refer [defnative-element-factories with-let extend-protocol*]])
   (:require
-    [daggerml.cells :as c :refer [cell cell? do-watch watch=]]
+    [clojure.string :as string]
+    [clojure.walk :as walk]
+    [daggerml.cells :as c :refer [cell cell? cell= do-watch watch=]]
+    [garden.core :as g]
     [goog.events :as events]))
 
+(declare ->node do! element on! SLOT compile-styles)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; vars ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def ^:dynamic *custom-element* nil)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow-cljs hooks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn ^:dev/before-load before-load
   []
   (.reload js/location))
 
-;; Nodes ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- child-vec
+  [this]
+  (let [x (.-childNodes this)]
+    (areduce x i ret [] (conj ret (.item x i)))))
+
+(defn- vflatten
+  ([x] (persistent! (vflatten (transient []) x)))
+  ([acc x] (if (sequential? x) (reduce vflatten acc x) (conj! acc x))))
+
+(defn- remove-nil [nodes]
+  (reduce #(if %2 (conj %1 %2) %1) [] nodes))
+
+(defn- compact-kids
+  [kids]
+  (->>
+    (vflatten kids)
+    (remove-nil)
+    (mapv ->node)))
+
+(defn- set-dom-children!
+  [elem new-kids]
+  (let [new-kids (compact-kids new-kids)
+        new?     (set new-kids)]
+    (loop [[new-kid & nks]              new-kids
+           [old-kid & oks :as old-kids] (child-vec elem)]
+      (when (or new-kid old-kid)
+        (cond
+          (= new-kid old-kid) (recur nks oks)
+          (not old-kid)       (do (.appendChild elem new-kid)
+                                  (recur nks oks))
+          (not new-kid)       (do (when-not (new? old-kid) (.removeChild elem old-kid))
+                                  (recur nks oks))
+          :else               (do (.insertBefore elem new-kid old-kid)
+                                  (recur nks old-kids)))))))
+
+(defn- attribute?
+  [x]
+  (or (keyword? x) (symbol? x)))
+
+(defn- parse-args
+  [args]
+  (loop [attr (transient {})
+         kids (transient [])
+         [arg & args] args]
+    (if-not (or arg args)
+      [(persistent! attr) (persistent! kids)]
+      (cond (map? arg)       (recur (reduce-kv assoc! attr arg) kids args)
+            (set? arg)       (recur (reduce #(assoc! %1 %2 true) attr arg) kids args)
+            (attribute? arg) (recur (assoc! attr arg (first args)) kids (rest args))
+            (seq? arg)       (recur attr (reduce conj! kids (vflatten arg)) args)
+            (vector? arg)    (recur attr (reduce conj! kids (vflatten arg)) args)
+            :else            (recur attr (conj! kids arg) args)))))
+
+(defn- define-property!
+  [the-class property-name getter setter]
+  (js/Object.defineProperty
+    (.-prototype the-class)
+    property-name
+    #js {:get (fn [] (this-as this (getter this)))
+         :set (fn [x] (this-as this (setter this x)))}))
+
+(defn- slot-cell
+  [& [slot-name]]
+  (let [c (cell [])
+        s (if slot-name (SLOT {:name slot-name}) (SLOT))
+        f #(reset! c (into [] (array-seq (.assignedElements s))))]
+    (on! s :slotchange f)
+    (specify! c
+      IFn
+      (-invoke
+        ([this] s)
+        ([this a] (doto s (element [a])))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; protocols ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defprotocol IDomNode
   (-node [this]))
 
-(defn node? [this]
-  (satisfies? IDomNode this))
-
 (extend-protocol IDomNode
+  js/DocumentFragment
+  (-node [this]
+    (child-vec this))
   string
   (-node [this]
     (.createTextNode js/document this))
@@ -32,74 +119,129 @@
   (-node [this]
     (.createTextNode js/document (str this))))
 
-(defn- ->node
+(defprotocol IDomElement
+  (-proxy-kids    [this])
+  (-append-child  [this child])
+  (-remove-child  [this child])
+  (-replace-child [this new existing])
+  (-insert-before [this new existing]))
+
+(extend-protocol* IDomElement
+  [js/Element js/ShadowRoot]
+  (-proxy-kids
+    ([this]
+     (if-let [hl-kids (.-proxyKids this)] hl-kids
+       (with-let [kids (atom (child-vec this))]
+         (set! (.-proxyKids this) kids)
+         (do-watch kids #(set-dom-children! this %2))))))
+  (-append-child
+    ([this child]
+     (with-let [child child]
+       (let [kids (-proxy-kids this)
+             i    (count @kids)]
+         (if (cell? child)
+           (do-watch child #(swap! kids assoc i %2))
+           (swap! kids assoc i child))))))
+  (-remove-child
+    ([this child]
+     (with-let [child child]
+       (let [kids (-proxy-kids this)
+             before-count (count @kids)]
+         (if (cell? child)
+           (swap! kids #(vec (remove (partial = @child) %)))
+           (swap! kids #(vec (remove (partial = child) %))))))))
+  (-replace-child
+    ([this new existing]
+     (with-let [existing existing]
+       (swap! (-proxy-kids this) #(mapv (fn [el] (if (= el existing) new el)) %)))))
+  (-insert-before
+    ([this new existing]
+     (with-let [new new, ins #(if (= % existing) [new %] [%])]
+       (cond
+         (not existing)       (swap! (-proxy-kids this) conj new)
+         (not= new existing)  (swap! (-proxy-kids this) #(vec (mapcat ins %))))))))
+
+(defn element?
+  [this]
+  (and
+    (instance? js/Element this)
+    (satisfies? IDomElement this)))
+
+(defn native?
+  [elem]
+  (and
+    (instance? js/Element elem)
+    (not (element? elem))))
+
+(defn native-node?
+ [node]
+ (and
+  (instance? js/Node node)
+  (not (element? node))))
+
+
+(defn node? [this]
+  (satisfies? IDomNode this))
+
+(defn ->node
   [x]
   (if (node? x) (-node x) x))
 
-;; attributes ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; multimethods ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmulti attr! (fn [_ k _] k) :default ::default)
+(defmulti do! (fn [e k v v'] k) :default ::default)
 
-(defmethod attr! ::default
-  [e k v]
-  (if (cell? v)
-    (watch= v (attr! e k @v))
+(defmethod do! ::default
+  [e k v v']
+  (if (keyword? k)
     (let [k (name k)]
-      (cond (not v)   (.removeAttribute e k)
-            (true? v) (.setAttribute e k k)
-            :else     (.setAttribute e k v)))))
+      (cond (not v')    (.removeAttribute e k)
+            (true? v')  (.setAttribute e k k)
+            :else       (.setAttribute e k v')))
+    (aset e (name k) v')))
 
-(defmethod attr! :html
-  [e _ v]
-  (set! (.-innerHTML e) v))
+(defmethod do! :style
+  [e k v v']
+  (let [v'' (compile-styles v')]
+    ((get-method do! ::default) e k v v'')))
 
-;; properties ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmulti on! (fn [e k f] k) :default ::default)
 
-(defmulti prop! (fn [_ k _] k) :default ::default)
+(defmethod on! ::default
+  [e k f]
+  (events/listen e (name k) f))
 
-(defmethod prop! ::default
-  [e k v]
-  (if (cell? v)
-    (watch= v (prop! e k @v))
-    (aset e (name k) v)))
-
-;; events ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmulti event! (fn [_ k _] k) :default ::default)
-
-(defmethod event! ::default
-  [e k v]
-  (events/listen e (name k) v))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; built-in element constructors ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn- init!
+(defn element
   [e args]
-  (let [attr? (map? (first args))
-        attrs (when attr? (first args))
-        kids  (if attr? (rest args) args)]
+  (let [[attrs kids] (parse-args args)]
     (doseq [[k v] attrs]
-      (cond (fn? v)       (event! e k v)
-            (keyword? k)  (attr! e k v)
-            (symbol? k)   (prop! e k v)))
-    (doseq [k kids] (.appendChild e (->node k)))))
+      (cond (fn? v)   (on! e k v)
+            (cell? v) (do-watch v #(do! e k %1 %2))
+            :else     (do! e k nil v)))
+    (doseq [k kids] (-append-child e (->node k)))))
 
 (defn element-factory
   [tag]
   (fn [& args]
-    (doto (.createElement js/document tag) (init! args))))
+    (doto (.createElement js/document tag) (element args))))
 
 (defn BODY
   [& args]
   (assert (not *custom-element*) "BODY not available inside deftag body")
-  (doto (.-body js/document) (init! args)))
+  (doto (.-body js/document) (element args)))
 
 (defn SHADOW-ROOT
   [& args]
   (assert *custom-element* "SHADOW-ROOT not available outside deftag body")
-  (doto (.-shadowRoot *custom-element*) (init! args)))
+  (doto (.-shadowRoot *custom-element*) (element args)))
 
-(defn COMMENT
+(defn !--
   [text]
   (.createComment js/document text))
 
@@ -125,84 +267,77 @@
   COL         H2          MAP         Q           TABLE
   COLGROUP    H3          MARK        RP          TBODY                       )
 
-(defn slot-cell
-  [slot-name]
-  (let [c (cell [])
-        s (SLOT {:name slot-name})
-        f #(reset! c (into [] (array-seq (.assignedElements s))))]
-    (event! s :slotchange f)
-    (specify! c
-      IFn
-      (-invoke
-        ([this] s)
-        ([this a] (init! s [a]))))))
+(def define-template
+  (memoize
+    (fn [body-text]
+      (let [tpl (TEMPLATE)]
+        (set! (.-innerHTML tpl) body-text)
+        #(.cloneNode (.-content tpl) true)))))
 
-(defn- define-property!
-  [the-class property-name getter setter]
-  (js/Object.defineProperty
-    (.-prototype the-class)
-    property-name
-    #js {:get (fn [] (this-as this (getter this)))
-         :set (fn [x] (this-as this (setter this x)))}))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; custom element definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn custom-element*
-  [tag props attrs slots render]
+  [tag props attrs named-slots default-slot render]
   (let [tag (.toLowerCase tag)
         the-class
         (js*
           "
-            (function() {
-              const $reset  = ~{};
-              const $cell   = ~{};
-              const $slot   = ~{};
-              const $watch  = ~{};
-              const $props  = ~{};
-              const $attrs  = ~{};
-              const $slots  = ~{};
-              const $render = ~{};
-              return class extends HTMLElement {
-                static get observedAttributes() {
-                  return $attrs;
-                }
-                constructor() {
-                  super();
-                  this['_rendered'] = 0;
-                  this['_props'] = $props.reduce((xs, x) => {
-                    xs[x] = $cell(null);
-                    return xs;
-                  }, {});
-                  this['_slots'] = $slots.reduce((xs, x) => {
-                    xs[x] = $slot(x);
-                    return xs;
-                  }, {});
-                  this['_connected'] = $cell.call(null, null);
-                  this.attachShadow({mode: 'open'});
-                }
-                connectedCallback() {
-                  $reset(this['_connected'], true);
-                  const myself = this;
-                  if (!this['_rendered']++) {
-                    $attrs.forEach((x) => {
-                      $watch(myself['_props'][x], (v) => {
-                        if (myself[x] != v) myself[x] = v;
-                        if (v === null || v === undefined) {
-                          myself.removeAttribute(x);
-                        } else {
-                          myself.setAttribute(x, v);
-                        }
-                      });
+          (function() {
+            const $reset    = ~{};
+            const $cell     = ~{};
+            const $slot     = ~{};
+            const $watch    = ~{};
+            const $props    = ~{};
+            const $attrs    = ~{};
+            const $slots    = ~{};
+            const $dfl_slot = ~{};
+            const $render   = ~{};
+            return class extends HTMLElement {
+              static get observedAttributes() {
+                return $attrs;
+              }
+              constructor() {
+                super();
+                this['_rendered'] = 0;
+                this['_props'] = $props.reduce((xs, x) => {
+                  xs[x] = $cell(null);
+                  return xs;
+                }, {});
+                this['_slots'] = $slots.reduce((xs, x) => {
+                  xs[x] = $slot(x);
+                  return xs;
+                }, {});
+                if ($dfl_slot) this['_slots'][$dfl_slot] = $slot();
+                this['_connected'] = $cell(null);
+                this.attachShadow({mode: 'open'});
+              }
+              connectedCallback() {
+                $reset(this['_connected'], true);
+                const myself = this;
+                if (!this['_rendered']++) {
+                  $attrs.forEach((x) => {
+                    $watch(myself['_props'][x], (oldVal, newVal) => {
+                      if (myself[x] !== newVal) myself[x] = newVal;
+                      if (newVal === null || newVal === undefined) {
+                        myself.removeAttribute(x);
+                      } else {
+                        myself.setAttribute(x, newVal);
+                      }
                     });
-                    $render(this);
-                  }
+                  });
+                  $render(this);
                 }
-                disconnectedCallback() {
-                  $reset(this['_connected'], false);
-                }
-                attributeChangedCallback(name, oldval, newval) {
-                  if (newval != oldval) this[name] = newval;
-                }
-              };
-            })();
+              }
+              disconnectedCallback() {
+                $reset(this['_connected'], false);
+              }
+              attributeChangedCallback(name, oldval, newval) {
+                if (newval != oldval) this[name] = newval;
+              }
+            };
+          })();
           "
           reset!
           cell
@@ -210,7 +345,8 @@
           do-watch
           (into-array props)
           (into-array attrs)
-          (into-array slots)
+          (into-array named-slots)
+          default-slot
           render)]
     (doseq [prop props]
       (define-property! the-class prop
@@ -218,3 +354,33 @@
         (fn [this x] (reset! (aget (aget this "_props") prop) x))))
     (js/window.customElements.define tag the-class)
     (element-factory tag)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; dynamic child nodes sequence ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn loop-tpl*
+  [items tpl]
+  (let [els         (cell [])
+        itemsv      (cell= (vec @items))
+        items-count (cell= (count @items))]
+    (do-watch items-count
+      (fn [_ n]
+        (when (< (count @els) n)
+          (doseq [i (range (count @els) n)]
+            (swap! els assoc i (tpl (cell= (get @itemsv i nil))))))))
+    (cell= (subvec @els 0 (min @items-count (count @els))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; css ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- get-style
+  [k]
+  (or (and (keyword? k) (namespace k) (str "var(--" (name k) ")")) k))
+
+(defn compile-styles
+  [xs]
+  (->> (if (sequential? xs) xs [xs])
+       (walk/postwalk get-style)
+       (apply g/style)))
