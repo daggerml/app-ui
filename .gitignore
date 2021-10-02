@@ -1,6 +1,5 @@
-/public/js
-/public/css
-/test/
+/public/js/
+/test/browser/js/
 node_modules/
 .shadow-cljs
 .cache

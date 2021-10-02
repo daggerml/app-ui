@@ -3,10 +3,11 @@
  ["src"]
 
  :dependencies
- [[garden "1.3.10"]]
+ [[garden         "1.3.10"]
+  [metosin/reitit "0.5.15"]]
 
  :dev-http
- {8080 "public"}
+ {8888 "public"}
 
  :builds
  {:app
@@ -14,15 +15,15 @@
    :output-dir "public/js"
    :asset-path "/js"
    :compiler-options {:source-map true}
-   :modules {:main {:init-fn daggerml.app.main/-main}}}
+   :modules {:main {:init-fn daggerml.app.index/-main}}}
 
   :browser-test
   {:target :browser-test
-   :test-dir "test/js/"
+   :test-dir "test/browser/"
    :devtools {:http-port 8021
-              :http-root "test/js/"}}
+              :http-root "test/browser/"}}
 
   :node-test
   {:target :node-test
-   :output-to "test/node-tests.js"
+   :output-to "test/nodejs/tests.js"
    :autorun true}}}

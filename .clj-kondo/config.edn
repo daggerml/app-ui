@@ -1,0 +1,22 @@
+{:linters {:unused-namespace
+           {:exclude []}
+           :unused-referred-var
+           {:exclude {clojure.test [is deftest testing]}}
+           :type-mismatch
+           {:level      :warning
+            :namespaces {}}
+           :missing-docstring 
+           {:level :off}
+           :unsorted-required-namespaces 
+           {:level :warning}
+           :unresolved-symbol
+           {:exclude []}}
+ :lint-as {daggerml.cells/defc      clojure.core/def
+           daggerml.cells/defc=     clojure.core/def
+           daggerml.ui/with-let     clojure.core/let}
+ :output  {:exclude-files []}
+ :hooks   {:analyze-call {daggerml.ui/defdeftag                   hooks.ui/defdeftag
+                          daggerml.ui/defnative-element-factories hooks.ui/defnative-element-factories
+                          daggerml.ui/extend-protocol*            hooks.ui/extend-protocol*
+                          daggerml.app.ui/deftag                  hooks.ui/deftag
+                          cljs.core/specify!                      hooks.ui/specify!}}}

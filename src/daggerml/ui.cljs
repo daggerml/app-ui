@@ -2,13 +2,12 @@
   (:require-macros
     [daggerml.ui :refer [defnative-element-factories with-let extend-protocol*]])
   (:require
-    [clojure.string :as string]
     [clojure.walk :as walk]
-    [daggerml.cells :as c :refer [cell cell? cell= do-watch watch=]]
+    [daggerml.cells :as c :refer [cell cell? cell= do-watch]]
     [garden.core :as g]
     [goog.events :as events]))
 
-(declare ->node do! element on! SLOT compile-styles)
+(declare bind ->node do! element on! SLOT compile-styles)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; vars ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -63,9 +62,17 @@
           :else               (do (.insertBefore elem new-kid old-kid)
                                   (recur nks old-kids)))))))
 
-(defn- attribute?
+(defn- prop?
   [x]
   (or (keyword? x) (symbol? x)))
+
+(defn- get-prop
+  [e k]
+  (if (keyword? k) (.getAttribute e (name k)) (aget e (name k))))
+
+(defn- set-prop
+  [e k v]
+  ((get-method do! ::default) e k (get-prop e k) v))
 
 (defn- parse-args
   [args]
@@ -74,12 +81,12 @@
          [arg & args] args]
     (if-not (or arg args)
       [(persistent! attr) (persistent! kids)]
-      (cond (map? arg)       (recur (reduce-kv assoc! attr arg) kids args)
-            (set? arg)       (recur (reduce #(assoc! %1 %2 true) attr arg) kids args)
-            (attribute? arg) (recur (assoc! attr arg (first args)) kids (rest args))
-            (seq? arg)       (recur attr (reduce conj! kids (vflatten arg)) args)
-            (vector? arg)    (recur attr (reduce conj! kids (vflatten arg)) args)
-            :else            (recur attr (conj! kids arg) args)))))
+      (cond (map? arg)    (recur (reduce-kv assoc! attr arg) kids args)
+            (set? arg)    (recur (reduce #(assoc! %1 %2 true) attr arg) kids args)
+            (prop? arg)   (recur (assoc! attr arg (first args)) kids (rest args))
+            (seq? arg)    (recur attr (reduce conj! kids (vflatten arg)) args)
+            (vector? arg) (recur attr (reduce conj! kids (vflatten arg)) args)
+            :else         (recur attr (conj! kids arg) args)))))
 
 (defn- define-property!
   [the-class property-name getter setter]
@@ -161,6 +168,10 @@
          (not existing)       (swap! (-proxy-kids this) conj new)
          (not= new existing)  (swap! (-proxy-kids this) #(vec (mapcat ins %))))))))
 
+(extend-type js/Event
+  cljs.core/IDeref
+  (-deref [this] (.-target this)))
+
 (defn element?
   [this]
   (and
@@ -191,10 +202,10 @@
 ;; multimethods ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmulti do! (fn [e k v v'] k) :default ::default)
+(defmulti do! (fn [_e k _v _v'] k) :default ::default)
 
 (defmethod do! ::default
-  [e k v v']
+  [e k _v v']
   (if (keyword? k)
     (let [k (name k)]
       (cond (not v')    (.removeAttribute e k)
@@ -207,7 +218,11 @@
   (let [v'' (compile-styles v')]
     ((get-method do! ::default) e k v v'')))
 
-(defmulti on! (fn [e k f] k) :default ::default)
+(defmethod do! :bind
+  [e _ _ [k' e' c']]
+  (bind e k' e' c'))
+
+(defmulti on! (fn [_e k _f] k) :default ::default)
 
 (defmethod on! ::default
   [e k f]
@@ -300,23 +315,30 @@
               }
               constructor() {
                 super();
+                // rendering is only performed once in the element lifecycle
                 this['_rendered'] = 0;
+                // allocate a cell for each managed property
                 this['_props'] = $props.reduce((xs, x) => {
                   xs[x] = $cell(null);
                   return xs;
                 }, {});
+                // allocate a slot-cell for each slot
                 this['_slots'] = $slots.reduce((xs, x) => {
                   xs[x] = $slot(x);
                   return xs;
                 }, {});
+                // allocate a slot-cell for the default slot if there is one
                 if ($dfl_slot) this['_slots'][$dfl_slot] = $slot();
+                // allocate a cell indicating whether the element is mounted
                 this['_connected'] = $cell(null);
                 this.attachShadow({mode: 'open'});
               }
               connectedCallback() {
                 $reset(this['_connected'], true);
                 const myself = this;
+                // only performed once in the element lifecycle
                 if (!this['_rendered']++) {
+                  // attributes are bi-directionally bound to properties
                   $attrs.forEach((x) => {
                     $watch(myself['_props'][x], (oldVal, newVal) => {
                       if (myself[x] !== newVal) myself[x] = newVal;
@@ -334,6 +356,7 @@
                 $reset(this['_connected'], false);
               }
               attributeChangedCallback(name, oldval, newval) {
+                // attributes are bi-directionally bound to properties
                 if (newval != oldval) this[name] = newval;
               }
             };
@@ -384,3 +407,18 @@
   (->> (if (sequential? xs) xs [xs])
        (walk/postwalk get-style)
        (apply g/style)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn bind
+  [elem k e c]
+  (with-let [_ elem]
+    (do-watch c #(set-prop elem k %2))
+    (events/listen elem (name e) #(reset! c (get-prop elem k)))))
+
+(defn prevent-default-form-submission
+  []
+  (let [prevent? #(not (or (get-prop @% :action) (get-prop @% :method)))]
+    (on! (.-body js/document) :submit #(when (prevent? %) (.preventDefault %)))))

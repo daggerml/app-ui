@@ -86,7 +86,12 @@
   [tag & [maybe-doc & more :as args]]
   (let [doc           (if (string? maybe-doc) [maybe-doc] [])
         [[[& props] [& slots] connected] & body] (if (seq doc) more args)
-        tag-name      (name tag)
+        {:keys [prefix import display style render]} (->> body (partition 2) (map vec) (into {}))
+        css-prelude   (-> (reduce #(str %1 (format "@import url(%s);\n" %2)) "" import)
+                          (str (when display (format ":host{display:%s}\n" (name display)))))
+        style         (when style (str style "\n"))
+        tag-name      (str (when prefix (str (name prefix) "-")) (name tag))
+        style-sym     (gensym tag-name)
         prop-names    (map name props)
         attr-names    (keep #(when (:attr (meta %)) (name %)) props)
         slot-names    (keep #(when (not (:default (meta %))) (name %)) slots)
@@ -95,20 +100,42 @@
         aget          'cljs.core/aget
         prop-bind     (fn [x] [x (list aget (list aget this-sym "_props") (name x))])
         slot-bind     (fn [x] [x (list aget (list aget this-sym "_slots") (name x))])]
-    `(def ~tag
-       ~@doc
-       (custom-element*
-         ~tag-name
-         [~@prop-names]
-         [~@attr-names]
-         [~@slot-names]
-         ~dfl-slot-name
-         (fn [~this-sym]
-           (binding [*custom-element* ~this-sym]
-             (let [~@(mapcat prop-bind props)
-                   ~@(mapcat slot-bind slots)
-                   ~connected (~aget ~this-sym "_connected")]
-               ~@body)))))))
+    `(do (deftemplate ~style-sym
+           ~(str "<style>\n" css-prelude "\n" style "</style>"))
+         (def ~tag
+           ~@doc
+           (custom-element*
+             ~tag-name
+             [~@prop-names]
+             [~@attr-names]
+             [~@slot-names]
+             ~dfl-slot-name
+             (fn [~this-sym]
+               (binding [*custom-element* ~this-sym]
+                 (let [~@(mapcat prop-bind props)
+                       ~@(mapcat slot-bind slots)
+                       ~connected (~aget ~this-sym "_connected")]
+                   (SHADOW-ROOT (~style-sym) ~render)))))))))
+
+(defn defdeftag*
+  [skip import [tag & [display & more :as args]]]
+  (let [[display [bindings & [s & _ :as args]]]
+        (if (keyword? display) [display more] [nil args])
+        [style render] (if (string? s) args (cons nil args))
+        prefix (-> *ns* str (string/split #"\.") (->> (drop skip) (string/join "-")))]
+    `(deftag ~tag
+       ~bindings
+       :prefix  ~prefix
+       :import  ~import
+       :display ~display
+       :style   ~style
+       :render  ~render)))
+
+(defmacro defdeftag
+  [name & {:keys [skip-ns-parts import]}]
+  `(defmacro ~name
+     [~'& args#]
+     (defdeftag* ~(or skip-ns-parts 0) ~(or import #{}) args#)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; css ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

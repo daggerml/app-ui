@@ -1,15 +1,7 @@
 SHELL  := /bin/bash
-CSSIN   = src/css/main.css
-CSSOUT  = public/css/main.css
 
 yarn.lock: package.json
 	yarn install
-
-$(CSSOUT): $(CSSIN)
-	yarn tailwindcss -i $< -o $@
-
-css:
-	yarn tailwindcss -i $(CSSIN) -o $(CSSOUT) --watch
 
 dev: yarn.lock
 	yarn shadow-cljs watch app

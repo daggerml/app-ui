@@ -1,0 +1,37 @@
+@import url(/css/base.css);
+
+:root {
+  --transparent:                transparent;
+  --current:                    currentColor;
+  --blue-3:                     #1a1334;
+  --blue-2:                     #26294a;
+  --blue-1:                     #01545a;
+  --green-3:                    #017351;
+  --green-2:                    #03c383;
+  --green-1:                    #aad962;
+  --yellow:                     #fbbf45;
+  --orange:                     #ef6a32;
+  --red:                        #ed0345;
+  --purple-1:                   #a12a5e;
+  --purple-2:                   #710162;
+  --purple-3:                   #110141;
+
+  --shadow:                     var(--blue-3);
+
+  --design--bg:                 var(--green-1);
+  --design--grid-size:          60px;
+
+  --main-layout--side-width:    56px;
+
+  --nav--bg-home:               var(--red);
+  --nav--bg-home--hover:        var(--orange);
+  --nav--bg-home--active:       var(--yellow);
+
+  --nav--bg-norm:               var(--blue-2);
+  --nav--bg-norm--hover:        var(--purple-2);
+  --nav--bg-norm--active:       var(--purple-1);
+}
+
+#main-layout  { height: 100vh; }
+#main-nav     { height: 100vh; }
+#login-layer  { height: 100vh; width: 100vw; }
