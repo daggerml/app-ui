@@ -26,4 +26,4 @@
           (nav/ICON :href "#" :title "preferences"  :icon "settings")
           (nav/ICON :href "#" :title "help"         :icon "help")))
       (layer/MAIN :slot "content"
-        (layer/LOGIN :id "login-layer")))))
+        #_(layer/LOGIN :id "login-layer")))))

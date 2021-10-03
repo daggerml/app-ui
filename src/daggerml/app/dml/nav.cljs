@@ -51,7 +51,3 @@
    :href href
    :class (cell= (or @theme "norm"))
    (ui/B (typo/ICON :title title :icon icon))))
-
-(deftag SEPARATOR :block
-  [[] [] _]
-  (ui/DIV :style [{:margin-bottom :0.5em}]))
