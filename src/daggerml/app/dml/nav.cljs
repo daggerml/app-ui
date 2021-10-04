@@ -2,7 +2,7 @@
   (:require
     [daggerml.app.dml.typography :as typo]
     [daggerml.app.ui :refer [deftag]]
-    [daggerml.cells :as cell :refer [cell=]]
+    [daggerml.cells :as c :refer [cell=]]
     [daggerml.ui :as ui]))
 
 (deftag BAR :block

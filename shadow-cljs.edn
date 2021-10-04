@@ -15,7 +15,7 @@
    :output-dir "public/js"
    :asset-path "/js"
    :compiler-options {:source-map true}
-   :modules {:main {:init-fn daggerml.app.index/-main}}}
+   :modules {:main {:init-fn daggerml.app.main/-main}}}
 
   :browser-test
   {:target :browser-test

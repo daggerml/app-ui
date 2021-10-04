@@ -5,34 +5,25 @@
     [reitit.frontend :as rf]
     [reitit.frontend.easy :as rfe]))
 
+(def routes
+  [["/analytics"    ::anal]
+   ["/dag"          ::dags]
+   ["/dag/{id}"     ::dag]
+   ["/dashboard"    ::dash]
+   ["/home"         ::home]
+   ["/permissions"  ::perm]
+   ["/preferences"  ::pref]
+   ["/support"      ::supp]])
+
 (def route
   (c/cell nil))
 
-(def routes
-  [["/home"       ::home]
-   ["/dag"        ::dags]
-   ["/dag/{id}"   ::dag]])
+;; helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def router
+(def ^:private router
   (rf/router routes {:syntax :bracket}))
 
-(defn match-by-path
-  [& xs]
-  (apply r/match-by-path router xs))
-
-(defn match-by-name
-  [& xs]
-  (apply r/match-by-name router xs))
-
-(defn href
-  ([name]
-   (href name {}))
-  ([name path-params]
-   (href name path-params {}))
-  ([name path-params query-params]
-   (-> (match-by-name name path-params) (r/match->path query-params))))
-
-(defn match->route
+(defn- match->route
   [{{:keys [name]} :data :keys [path path-params query-params]}]
   {:name          name
    :path          path
@@ -40,10 +31,21 @@
    :path-params   path-params
    :query-params  query-params})
 
-(defn set-route!
+(defn- set-route!
   [match history]
   (reset! route (-> (match->route match) (assoc :history history))))
 
-(defn start
+;; api ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn start!
   []
   (rfe/start! router set-route! {}))
+
+(defn href
+  ([name]
+   (href name {}))
+  ([name path-params]
+   (href name path-params {}))
+  ([name path-params query-params]
+   (str "#" (-> (r/match-by-name router name path-params)
+                (r/match->path query-params)))))

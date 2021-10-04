@@ -5,6 +5,7 @@
     [clojure.walk :as walk]
     [daggerml.cells :as c :refer [cell cell? cell= do-watch]]
     [garden.core :as g]
+    [goog.dom.classlist :as domcl]
     [goog.events :as events]))
 
 (declare bind ->node do! element on! SLOT compile-styles)
@@ -213,6 +214,20 @@
             :else       (.setAttribute e k v')))
     (aset e (name k) v')))
 
+(defn- normalize-class
+  [x]
+  (cond (map? x)    (reduce-kv #(assoc %1 (name %2) %3) {} x)
+        (seq? x)    (zipmap (map name x) (repeat true))
+        (string? x) (zipmap (.split x #"\s+") (repeat true))
+        :else       {}))
+
+(defmethod do! :class
+  [e _ v v']
+  (let [p (normalize-class v)
+        q (normalize-class v')]
+    (doseq [k (reduce into #{} (map keys [p q]))]
+      (domcl/enable e k (boolean (q k))))))
+
 (defmethod do! :style
   [e k v v']
   (let [v'' (compile-styles v')]
@@ -418,7 +433,7 @@
     (do-watch c #(set-prop elem k %2))
     (events/listen elem (name e) #(reset! c (get-prop elem k)))))
 
-(defn prevent-default-form-submission
+(defn prevent-default-form-submit!
   []
   (let [prevent? #(not (or (get-prop @% :action) (get-prop @% :method)))]
     (on! (.-body js/document) :submit #(when (prevent? %) (.preventDefault %)))))
