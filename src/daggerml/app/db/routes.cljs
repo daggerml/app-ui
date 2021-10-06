@@ -6,19 +6,23 @@
     [reitit.frontend.easy :as rfe]))
 
 (def routes
-  [["/analytics"    ::anal]
-   ["/dag"          ::dags]
-   ["/dag/{id}"     ::dag]
-   ["/dashboard"    ::dash]
-   ["/home"         ::home]
-   ["/permissions"  ::perm]
-   ["/preferences"  ::pref]
-   ["/support"      ::supp]])
+  [["/analytics/"   ::anal]
+   ["/dags/"        ::dags]
+   ["/dashboards/"  ::dash]
+   ["/"             ::home]
+   ["/permissions/" ::perm]
+   ["/preferences/" ::pref]
+   ["/support/"     ::supp]])
 
 (def route
   (c/cell nil))
 
 ;; helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(c/watch= route
+  (let [hash (.-hash js/window.location)]
+    (when (not= "/" (.slice hash -1))
+      (set! js/window.location.hash (str hash "/")))))
 
 (def ^:private router
   (rf/router routes {:syntax :bracket}))

@@ -1,8 +1,8 @@
 (ns daggerml.app.dml.layer
   (:require
     [daggerml.app.ui :refer [deftag]]
-    [daggerml.ui :as ui]
-    [daggerml.cells :refer [cell cell=]]))
+    [daggerml.cells :refer [cell cell=]]
+    [daggerml.ui :as ui]))
 
 (deftag MAIN :block
   [[] [^:default content] _]
@@ -15,7 +15,7 @@
     width: 100vw;
     background:
       linear-gradient(-90deg, rgba(0,0,0,.05) 1px, transparent 1px),
-      linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px), 
+      linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px),
       linear-gradient(-90deg, rgba(0, 0, 0, .04) 1px, transparent 1px),
       linear-gradient(rgba(0,0,0,.04) 1px, transparent 1px),
       linear-gradient(transparent 3px, var(--design--bg) 3px, var(--design--bg) var(--size3), transparent var(--size3)),
@@ -80,5 +80,4 @@
         (ui/FORM
           (ui/LABEL "Email" (ui/INPUT :type "test" :bind ['value :keyup c]))
           (ui/BR)
-          (ui/LABEL "Password" (ui/INPUT :type "password"))
-          )))))
+          (ui/LABEL "Password" (ui/INPUT :type "password")))))))

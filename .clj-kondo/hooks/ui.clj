@@ -13,15 +13,20 @@
         :else         (api/token-node x)))
 
 (defn- defn-dom
-  [tag & body]
-  (list* 'defn tag ['& (gensym)] (seq body)))
+  ([tag]
+   (defn-dom tag (gensym) nil))
+  ([tag bindings body]
+   `(defn ~tag
+      [~'& sym#]
+      (let [~bindings sym#]
+        ~body))))
 
 ;; hooks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn specify!
   [{:keys [node]}]
   (let [[_ _ & args] (api/sexpr node)]
-    {:node (sexpr->node (list* 'reify args))}))
+    {:node (sexpr->node `(reify ~@args))}))
 
 (defn deftag
   [{:keys [node]}]
@@ -34,14 +39,14 @@
 (defn defdeftag
   [{:keys [node]}]
   (let [[_ sym] (api/sexpr node)]
-    {:node (sexpr->node (list 'def sym nil))}))
+    {:node (sexpr->node `(def ~sym nil))}))
 
 (defn defnative-element-factories
   [{:keys [node]}]
   (let [[_ & tags] (api/sexpr node)]
-    {:node (sexpr->node (list* 'do ['defnative-element-factories] (map defn-dom tags)))}))
+    {:node (sexpr->node `(do [~'defnative-element-factories] ~@(map defn-dom tags)))}))
 
 (defn extend-protocol*
   [{:keys [node]}]
   (let [[_ proto types & impls] (api/sexpr node)]
-    {:node (sexpr->node (list* 'extend-protocol proto (mapcat #(into [%] impls) types)))}))
+    {:node (sexpr->node `(extend-protocol ~proto ~@(mapcat #(into [%] impls) types)))}))

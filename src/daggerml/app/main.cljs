@@ -4,6 +4,7 @@
     [daggerml.app.dml.layer :as layer]
     [daggerml.app.dml.layout :as layout]
     [daggerml.app.dml.nav :as nav]
+    [daggerml.app.dml.nav.icon :as nav-icon]
     [daggerml.ui :as ui]))
 
 (defn -main
@@ -14,15 +15,15 @@
     (layout/MAIN :id "main-layout"
       (nav/BAR :id "main-nav" :slot "side"
         (ui/DIV :slot "header"
-          (nav/ICON :href (r/href ::r/home) :title "home" :icon "home" :theme "home"))
+          (nav-icon/HOME))
         (ui/DIV :slot "center"
-          (nav/ICON :href (r/href ::r/dash) :title "dashboards" :icon "dashboard")
-          (nav/ICON :href (r/href ::r/dags) :title "DAGs" :icon "account_tree")
-          (nav/ICON :href (r/href ::r/anal) :title "analytics" :icon "area_chart")
-          (nav/ICON :href (r/href ::r/perm) :title "permissions" :icon "admin_panel_settings"))
+          (nav-icon/DASHBOARDS)
+          (nav-icon/DAGS)
+          (nav-icon/ANALYTICS)
+          (nav-icon/PERMISSIONS))
         (ui/DIV :slot "footer"
-          (nav/ICON :href "#" :title "logout" :icon "logout")
-          (nav/ICON :href (r/href ::r/pref) :title "preferences" :icon "settings")
-          (nav/ICON :href (r/href ::r/supp) :title "support" :icon "contact_support")))
+          (nav-icon/LOGOUT)
+          (nav-icon/PREFERENCES)
+          (nav-icon/SUPPORT)))
       (layer/MAIN :slot "content"
         #_(layer/LOGIN :id "login-layer")))))

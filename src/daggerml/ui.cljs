@@ -208,10 +208,11 @@
 (defmethod do! ::default
   [e k _v v']
   (if (keyword? k)
-    (let [k (name k)]
+    (let [k   (name k)
+          v'' (name v')]
       (cond (not v')    (.removeAttribute e k)
             (true? v')  (.setAttribute e k k)
-            :else       (.setAttribute e k v')))
+            :else       (.setAttribute e k v'')))
     (aset e (name k) v')))
 
 (defn- normalize-class
