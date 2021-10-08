@@ -25,3 +25,28 @@
   (ui/DIV :id "container"
     (ui/DIV :id "side"  (side))
     (ui/DIV :id "content" (content))))
+
+(deftag CENTERED :block
+  [[] [^:default content] _]
+  "
+  :host {
+    height: 100%;
+    width: 100%;
+  }
+  #container {
+    display: grid;
+    grid-template-columns: 1fr min-content 1fr;
+    grid-template-rows: 1fr min-content 1fr;
+    justify-items: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+  }
+  #content {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  "
+  (ui/DIV :id "container"
+    (ui/DIV :id "content"
+      (content))))

@@ -1,5 +1,7 @@
 (ns daggerml.app.dml.layer
   (:require
+    [daggerml.app.dml.control :as control]
+    [daggerml.app.dml.layout :as layout]
     [daggerml.app.ui :refer [deftag]]
     [daggerml.cells :refer [cell cell=]]
     [daggerml.ui :as ui]))
@@ -7,29 +9,26 @@
 (deftag MAIN :block
   [[] [^:default content] _]
   "
+  :host {
+    height: 100vh;
+    width: 100vw;
+  }
   #container {
     --size1: var(--design--grid-size);
-    --size2: calc(var(--size1) / 10);
+    --size2: calc(var(--size1) / 5);
     --size3: calc(var(--size1) - 2px);
     min-height: 100vh;
+    padding-left: 56px;
     width: 100vw;
     background:
-      linear-gradient(-90deg, rgba(0,0,0,.05) 1px, transparent 1px),
-      linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px),
-      linear-gradient(-90deg, rgba(0, 0, 0, .04) 1px, transparent 1px),
+      linear-gradient(-90deg, rgba(215,229,204,0.5) 1px, transparent 1px),
+      linear-gradient(rgba(215,229,204,0.5) 1px, transparent 1px),
+      linear-gradient(-90deg, rgba(0,0,0,.04) 1px, transparent 1px),
       linear-gradient(rgba(0,0,0,.04) 1px, transparent 1px),
-      linear-gradient(transparent 3px, var(--design--bg) 3px, var(--design--bg) var(--size3), transparent var(--size3)),
-      linear-gradient(-90deg, #aaa 1px, transparent 1px),
-      linear-gradient(-90deg, transparent 3px, var(--design--bg) 3px, var(--design--bg) var(--size3), transparent var(--size3)),
-      linear-gradient(#aaa 1px, transparent 1px),
-      var(--design--bg);
+      #eaf4dc;
     background-size:
       var(--size2) var(--size2),
       var(--size2) var(--size2),
-      var(--size1) var(--size1),
-      var(--size1) var(--size1),
-      var(--size1) var(--size1),
-      var(--size1) var(--size1),
       var(--size1) var(--size1),
       var(--size1) var(--size1);
   }
@@ -47,8 +46,8 @@
     position: absolute;
     top: 0;
     left: 0;
-    min-height: 100vh;
-    width: 100vw;
+    min-height: 100%;
+    width: 100%;
     z-index: 1;
   }
   "
@@ -57,27 +56,55 @@
     (ui/DIV :id "content" (content))))
 
 (deftag LOGIN :block
-  [[] [] _]
+  [[] [] connected?]
   "
+  :host {
+    height: 100vh;
+    width: 100vw;
+  }
   #container {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    grid-template-rows: 1fr auto 1fr;
-    justify-items: center;
-    align-items: center;
-    height: 100%;
-    width: 100%;
   }
   #form {
-    grid-column: 2;
-    grid-row: 2;
+    background-color: white;
+    border: 4px solid var(--blue-2);
+    border-radius: 6px;
+  }
+  #form #title {
+    padding: 1em;
+    background-color: var(--blue-2);
+    color: white;
+  }
+  hr {
+    border: 1px solid var(--blue-2);
+    width: 100%;
+    margin-bottom: 0.5em;
+  }
+  form {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-gap: 0.5em;
+    padding: 1em;
+    padding-bottom: 0.5em;
   }
   "
-  (let [c (cell "asdf")]
-    (cell= (prn :c @c))
-    (ui/DIV :id "container"
+  (let [email     (cell nil)
+        password  (cell nil)
+        data      (cell= {:email @email :password @password})]
+    (layout/CENTERED :id "container"
       (ui/DIV :id "form"
+        (ui/DIV :id "title"
+          (ui/B "Login"))
         (ui/FORM
-          (ui/LABEL "Email" (ui/INPUT :type "test" :bind ['value :keyup c]))
-          (ui/BR)
-          (ui/LABEL "Password" (ui/INPUT :type "password")))))))
+          :submit #(do (.preventDefault %) (prn :data @data))
+          (control/TEXT
+            'label "Email"
+            'tabindex "1"
+            'autofocus true
+            :bind ['state :keyup email])
+          (control/PASSWORD
+            'label "Password"
+            :bind ['state :keyup password])
+          (control/CHECKBOX
+            'label " remember me on this device")
+          (ui/HR)
+          (control/SUBMIT :click #(prn :data @data)))))))

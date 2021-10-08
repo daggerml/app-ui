@@ -5,7 +5,12 @@
     [daggerml.app.dml.layout :as layout]
     [daggerml.app.dml.nav :as nav]
     [daggerml.app.dml.nav.icon :as nav-icon]
-    [daggerml.ui :as ui]))
+    [daggerml.cells :as c :refer [cell=]]
+    [daggerml.ui :as ui]
+    ["webfontloader" :as wfl]))
+
+(wfl/load
+  (clj->js {:custom {:families ["VT323" "Material Icons"]}}))
 
 (defn -main
   []
@@ -26,4 +31,6 @@
           (nav-icon/PREFERENCES)
           (nav-icon/SUPPORT)))
       (layer/MAIN :slot "content"
-        #_(layer/LOGIN :id "login-layer")))))
+        (ui/case= (cell= (:name @r/route))
+          ::r/home (layer/LOGIN :id "login-layer")
+          nil)))))

@@ -1,12 +1,13 @@
 (ns daggerml.ui
   (:require-macros
-    [daggerml.ui :refer [defnative-element-factories with-let extend-protocol*]])
+    [daggerml.ui :refer [defnative-element-factories with-let with-timeout extend-protocol*]])
   (:require
     [clojure.walk :as walk]
     [daggerml.cells :as c :refer [cell cell? cell= do-watch]]
     [garden.core :as g]
     [goog.dom.classlist :as domcl]
-    [goog.events :as events]))
+    [goog.events :as events]
+    [goog.fx.css3 :as gfc3]))
 
 (declare bind ->node do! element on! SLOT compile-styles)
 
@@ -199,6 +200,10 @@
   [x]
   (if (node? x) (-node x) x))
 
+(defn name*
+  [x]
+  (try (name x) (catch js/Error _ (str x))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; multimethods ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -208,11 +213,10 @@
 (defmethod do! ::default
   [e k _v v']
   (if (keyword? k)
-    (let [k   (name k)
-          v'' (name v')]
+    (let [k (name k)]
       (cond (not v')    (.removeAttribute e k)
             (true? v')  (.setAttribute e k k)
-            :else       (.setAttribute e k v'')))
+            :else       (.setAttribute e k v')))
     (aset e (name k) v')))
 
 (defn- normalize-class
@@ -233,6 +237,11 @@
   [e k v v']
   (let [v'' (compile-styles v')]
     ((get-method do! ::default) e k v v'')))
+
+(defmethod do! :focus
+  [e k _ v']
+  (prn :do! e k v')
+  (when v' (with-timeout 0 (.focus e))))
 
 (defmethod do! :bind
   [e _ _ [k' e' c']]
@@ -420,9 +429,10 @@
 
 (defn compile-styles
   [xs]
-  (->> (if (sequential? xs) xs [xs])
-       (walk/postwalk get-style)
-       (apply g/style)))
+  (or (and (string? xs) xs)
+      (->> (if (sequential? xs) xs [xs])
+           (walk/postwalk get-style)
+           (apply g/style))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -437,4 +447,4 @@
 (defn prevent-default-form-submit!
   []
   (let [prevent? #(not (or (get-prop @% :action) (get-prop @% :method)))]
-    (on! (.-body js/document) :submit #(when (prevent? %) (.preventDefault %)))))
+    (on! (.-body js/document) :submit #(when (prevent? %) (.preventDefault %) false))))

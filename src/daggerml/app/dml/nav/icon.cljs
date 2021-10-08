@@ -47,10 +47,10 @@
     'icon "logout"
     :click #(do (prn :logged-out) (.preventDefault %))))
 
-(deftag HOME        [[] [] _] (icon ::r/home :home         :home                 :home))
-(deftag DASHBOARDS  [[] [] _] (icon ::r/dash :dashboards   :dashboard))
-(deftag DAGS        [[] [] _] (icon ::r/dags :DAGs         :account_tree))
-(deftag ANALYTICS   [[] [] _] (icon ::r/anal :analytics    :area_chart))
-(deftag PERMISSIONS [[] [] _] (icon ::r/perm :permissions  :admin_panel_settings))
-(deftag PREFERENCES [[] [] _] (icon ::r/pref :preferences  :settings))
-(deftag SUPPORT     [[] [] _] (icon ::r/supp :support      :contact_support))
+(deftag HOME        [[] [] _] (icon ::r/home "home"        "home"                "home"))
+(deftag DASHBOARDS  [[] [] _] (icon ::r/dash "dashboards"  "dashboard"))
+(deftag DAGS        [[] [] _] (icon ::r/dags "DAGs"        "account_tree"))
+(deftag ANALYTICS   [[] [] _] (icon ::r/anal "analytics"   "area_chart"))
+(deftag PERMISSIONS [[] [] _] (icon ::r/perm "permissions" "admin_panel_settings"))
+(deftag PREFERENCES [[] [] _] (icon ::r/pref "preferences" "settings"))
+(deftag SUPPORT     [[] [] _] (icon ::r/supp "support"     "contact_support"))

@@ -1,11 +1,15 @@
 (ns daggerml.app.dml.nav
   (:require
+    [daggerml.cells :refer [cell=]]
     [daggerml.app.ui :refer [deftag]]
     [daggerml.ui :as ui]))
 
 (deftag BAR :block
-  [[] [header center footer] _]
+  [[] [header center footer] connected?]
   "
+  :host {
+    height: 100vh;
+  }
   #container {
     display: grid;
     grid-template-columns: 1fr;

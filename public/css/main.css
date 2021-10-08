@@ -18,9 +18,7 @@
 
   --shadow:                     var(--blue-3);
 
-  --design--bg:                 var(--green-1);
   --design--grid-size:          60px;
-
   --main-layout--side-width:    56px;
 
   --nav--bg-home:               var(--red);
@@ -32,6 +30,4 @@
   --nav--bg-norm--active:       var(--purple-1);
 }
 
-#main-layout  { height: 100vh; }
-#main-nav     { height: 100vh; }
-#login-layer  { height: 100vh; width: 100vw; }
+.wf-loading { display: none; }
