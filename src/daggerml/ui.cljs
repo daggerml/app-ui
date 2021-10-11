@@ -1,15 +1,13 @@
 (ns daggerml.ui
   (:require-macros
-    [daggerml.ui :refer [defnative-element-factories with-let with-timeout extend-protocol*]])
+    [daggerml.ui :as ui :refer [guard with-let with-timeout]])
   (:require
-    [clojure.walk :as walk]
+    ["element-internals-polyfill"]
     [daggerml.cells :as c :refer [cell cell? cell= do-watch]]
-    [garden.core :as g]
     [goog.dom.classlist :as domcl]
-    [goog.events :as events]
-    [goog.fx.css3 :as gfc3]))
+    [goog.events :as events]))
 
-(declare bind ->node do! element on! SLOT compile-styles)
+(declare bind ->node do! element on! SLOT)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; vars ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -91,12 +89,22 @@
             :else         (recur attr (conj! kids arg) args)))))
 
 (defn- define-property!
-  [the-class property-name getter setter]
-  (js/Object.defineProperty
-    (.-prototype the-class)
-    property-name
-    #js {:get (fn [] (this-as this (getter this)))
-         :set (fn [x] (this-as this (setter this x)))}))
+  ([the-class property-name getter]
+   (define-property! the-class property-name getter nil))
+  ([the-class property-name getter setter]
+   (js/Object.defineProperty
+     (.-prototype the-class)
+     property-name
+     (clj->js (cond-> {:enumerable true}
+                getter (assoc :get (fn [] (this-as this (getter this))))
+                setter (assoc :set (fn [x] (this-as this (setter this x)))))))))
+
+(defn define-read-only-properties!
+  [the-class already-defined-props & args]
+  (let [pairs (partition 2 args)]
+    (doseq [[prop getter] pairs]
+      (when-not (already-defined-props prop)
+        (define-property! the-class prop getter)))))
 
 (defn- slot-cell
   [& [slot-name]]
@@ -135,7 +143,7 @@
   (-replace-child [this new existing])
   (-insert-before [this new existing]))
 
-(extend-protocol* IDomElement
+(ui/extend-protocol* IDomElement
   [js/Element js/ShadowRoot]
   (-proxy-kids
     ([this]
@@ -171,6 +179,10 @@
          (not= new existing)  (swap! (-proxy-kids this) #(vec (mapcat ins %))))))))
 
 (extend-type js/Event
+  cljs.core/IDeref
+  (-deref [this] (.-target this)))
+
+(extend-type events/BrowserEvent
   cljs.core/IDeref
   (-deref [this] (.-target this)))
 
@@ -233,15 +245,13 @@
     (doseq [k (reduce into #{} (map keys [p q]))]
       (domcl/enable e k (boolean (q k))))))
 
-(defmethod do! :style
-  [e k v v']
-  (let [v'' (compile-styles v')]
-    ((get-method do! ::default) e k v v'')))
-
 (defmethod do! :focus
-  [e k _ v']
-  (prn :do! e k v')
-  (when v' (with-timeout 0 (.focus e))))
+  [e _ _ v']
+  (when v' (with-timeout 0 (guard (doto e .focus .select)))))
+
+(defmethod do! :error
+  [e _ _ v']
+  (.setError ^js e v'))
 
 (defmethod do! :bind
   [e _ _ [k' e' c']]
@@ -285,7 +295,7 @@
   [text]
   (.createComment js/document text))
 
-(defnative-element-factories
+(ui/defnative-element-factories
   A           DATA        H4          MENU        RT          TD
   ABBR        DATALIST    H5          MENUITEM    RTC         TEMPLATE
   ADDRESS     DD          H6          META        RUBY        TEXTAREA
@@ -319,87 +329,196 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn custom-element*
-  [tag props attrs named-slots default-slot render]
+  [& {:keys [tag opts attrs props callbacks methods form-value named-slots default-slot render]}]
   (let [tag (.toLowerCase tag)
         the-class
         (js*
           "
           (function() {
-            const $reset    = ~{};
-            const $cell     = ~{};
-            const $slot     = ~{};
-            const $watch    = ~{};
-            const $props    = ~{};
-            const $attrs    = ~{};
-            const $slots    = ~{};
-            const $dfl_slot = ~{};
-            const $render   = ~{};
+            const $opts       = ~{};
+            const $formVal    = ~{};
+            const $reset      = ~{};
+            const $deref      = ~{};
+            const $js2clj     = ~{};
+            const $cell       = ~{};
+            const $slot       = ~{};
+            const $watch      = ~{};
+            const $attrs      = ~{};
+            const $props      = ~{};
+            const $slots      = ~{};
+            const $dfl_slot   = ~{};
+            const $callbacks  = ~{};
+            const $methods    = ~{};
+            const $render     = ~{};
+
+            const $typeof = x => Object.prototype.toString.call(x).slice(8, -1);
+
+            const $state2value = (x) => {
+              switch ($typeof(x)) {
+                case 'File':
+                case 'FormData':
+                case 'String':
+                  return x;
+                case 'Null':
+                case 'Undefined':
+                  return '';
+                default:
+                  return '' + x;
+              }
+            }
+
+            const $kebabMethodName = {
+              'set-error': 'setError',
+            }
+
             return class extends HTMLElement {
+
+              // returns array of attr names that will be observed
               static get observedAttributes() {
                 return $attrs;
               }
+
+              // FACE: form attached custom element
+              static formAssociated = !!$formVal;
+
               constructor() {
                 super();
+
+                const myself = this;
+
+                // provides access to form-related internals
+                if ($formVal) this['_internals'] = this.attachInternals();
+
                 // rendering is only performed once in the element lifecycle
                 this['_rendered'] = 0;
+
                 // allocate a cell for each managed property
                 this['_props'] = $props.reduce((xs, x) => {
                   xs[x] = $cell(null);
                   return xs;
                 }, {});
-                // allocate a slot-cell for each slot
+
+                // allocate a slot-cell for each named slot
                 this['_slots'] = $slots.reduce((xs, x) => {
                   xs[x] = $slot(x);
                   return xs;
                 }, {});
+
                 // allocate a slot-cell for the default slot if there is one
                 if ($dfl_slot) this['_slots'][$dfl_slot] = $slot();
-                // allocate a cell indicating whether the element is mounted
-                this['_connected'] = $cell(null);
+
+                this['_callbacks'] = $callbacks.reduce((xs, x) => {
+                  xs[x] = $cell(null);
+                  return xs;
+                }, {});
+
+                this['_methods'] = $methods.reduce((xs, x) => {
+                  let m = $kebabMethodName[x];
+                  if (m) xs[x] = myself[m].bind(myself);
+                  return xs;
+                }, {});
+
                 this.attachShadow({mode: 'open'});
               }
+
               connectedCallback() {
-                $reset(this['_connected'], true);
                 const myself = this;
-                // only performed once in the element lifecycle
+
+                const cb = this['_callbacks']['connected'];
+                if (cb) $reset(cb, true);
+
+                // ensures performed at most once in the element lifecycle
                 if (!this['_rendered']++) {
-                  // attributes are bi-directionally bound to properties
-                  $attrs.forEach((x) => {
-                    $watch(myself['_props'][x], (oldVal, newVal) => {
-                      if (myself[x] !== newVal) myself[x] = newVal;
-                      if (newVal === null || newVal === undefined) {
-                        myself.removeAttribute(x);
-                      } else {
-                        myself.setAttribute(x, newVal);
-                      }
+                  if ($formVal) {
+                    let fv = this['_props'][$formVal];
+
+                    if ($deref(fv) == null) $reset(fv, this.getAttribute($formVal));
+
+                    $watch(fv, (oldVal, newVal) => {
+                      const v = $state2value(newVal);
+                      this['_internals']['setFormValue'](v);
                     });
-                  });
+                  }
                   $render(this);
                 }
               }
+
               disconnectedCallback() {
-                $reset(this['_connected'], false);
+                const cb = this['_callbacks']['connected'];
+                if (cb) $reset(cb, false);
               }
+
               attributeChangedCallback(name, oldval, newval) {
-                // attributes are bi-directionally bound to properties
-                if (newval != oldval) this[name] = newval;
+                let cb = this['_callbacks']['attribute-changed'];
+                if (cb) $reset(cb, $js2clj([name, oldval, newval]));
+              }
+
+              formAssociatedCallback(form) {
+                const cb = this['_callbacks']['form-associated'];
+                if (cb) $reset(cb, form);
+              }
+
+              formDisabledCallback(disabled) {
+                const cb = this['_callbacks']['disabled'];
+                if (cb) $reset(cb, disabled);
+              }
+
+              formResetCallback() {
+                if ($formVal) $reset(this['_props'][$formVal], this.getAttribute($formVal));
+              }
+
+              formStateRestoreCallback(state, mode) {
+                if ($formVal) $reset(this['_props'][$formVal], state);
+              }
+
+              checkValidity() {
+                if ($formVal) return this['_internals']['checkValidity']();
+              }
+
+              reportValidity() {
+                if ($formVal) return this['_internals']['reportValidity']();
+              }
+
+              setError(message) {
+                if ($formVal) {
+                  if (message) {
+                    this['_internals']['setValidity']({customError: true}, message);
+                  } else {
+                    this['_internals']['setValidity']({});
+                  }
+                }
               }
             };
           })();
           "
+          (clj->js opts)
+          form-value
           reset!
+          deref
+          js->clj
           cell
           slot-cell
           do-watch
-          (into-array props)
           (into-array attrs)
+          (into-array props)
           (into-array named-slots)
           default-slot
+          (into-array callbacks)
+          (into-array methods)
           render)]
     (doseq [prop props]
       (define-property! the-class prop
         (fn [this] @(aget (aget this "_props") prop))
         (fn [this x] (reset! (aget (aget this "_props") prop) x))))
+    (when form-value
+      (define-read-only-properties!
+        the-class (set props)
+        "form"              #(-> % (aget "_internals") (aget "form"))
+        "name"              #(-> % (.getAttribute "name"))
+        "type"              #(.-localName %)
+        "validity"          #(-> % (aget "_internals") (aget "validity"))
+        "validationMessage" #(-> % (aget "_internals") (aget "validationMessage"))
+        "willValidate"      #(-> % (aget "_internals") (aget "willValidate"))))
     (js/window.customElements.define tag the-class)
     (element-factory tag)))
 
@@ -420,21 +539,6 @@
     (cell= (subvec @els 0 (min @items-count (count @els))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; css ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn- get-style
-  [k]
-  (or (and (keyword? k) (namespace k) (str "var(--" (name k) ")")) k))
-
-(defn compile-styles
-  [xs]
-  (or (and (string? xs) xs)
-      (->> (if (sequential? xs) xs [xs])
-           (walk/postwalk get-style)
-           (apply g/style))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -443,8 +547,3 @@
   (with-let [_ elem]
     (do-watch c #(set-prop elem k %2))
     (events/listen elem (name e) #(reset! c (get-prop elem k)))))
-
-(defn prevent-default-form-submit!
-  []
-  (let [prevent? #(not (or (get-prop @% :action) (get-prop @% :method)))]
-    (on! (.-body js/document) :submit #(when (prevent? %) (.preventDefault %) false))))

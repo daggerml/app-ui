@@ -4,10 +4,11 @@
     [daggerml.app.ui :refer [deftag]]
     [daggerml.ui :as ui]))
 
-(deftag BAR :block
-  [[] [header center footer] connected?]
+(deftag BAR
+  [_ [] [header center footer] [] []]
   "
   :host {
+    display: block;
     height: 100vh;
   }
   #container {

@@ -6,6 +6,26 @@
 (def ^:private formula  'daggerml.cells/formula)
 (def ^:private cell-let 'daggerml.cells/cell-let)
 
+;; helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- any-meta
+  [& ks]
+  (comp (apply some-fn ks) meta))
+
+(defn- not-meta
+  [& ks]
+  (complement (apply any-meta ks)))
+
+(defn- wrap-html
+  [tag content]
+  (format "<%s>\n%s\n</%s>" (name tag) content (name tag)))
+
+;; macros ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro guard
+  [& body]
+  `(try ~@body (catch js/Error _#)))
+
 (defmacro extend-protocol*
   [protocol [& types] & protocol-methods]
   `(extend-protocol ~protocol
@@ -75,72 +95,76 @@
   [name inner-html]
   `(def ~name (define-template ~inner-html)))
 
-(defmacro deftag
-  "Defines a custom element named <tag> and a constructor function of the same
-   name. The <props> and <slots> arguments are bound to cells which update the
-   element's properties and slots bi-directionally. The <connected> argument is
-   bound to a cell indicating the element's connected/disconnected state. The
-   <props> may have ^:attr meta, in which case the property will be synced with
-   an attribute of the same name, bi-directionally."
-  {:arglists '([tag doc? config? [[& props] [& slots] connected] & body])}
-  [tag & [maybe-doc & more :as args]]
-  (let [doc           (if (string? maybe-doc) [maybe-doc] [])
-        [[[& props] [& slots] connected] & body] (if (seq doc) more args)
-        {:keys [prefix import display style render]} (->> body (partition 2) (map vec) (into {}))
-        css-prelude   (-> (reduce #(str %1 (format "@import url(%s);\n" %2)) "" import)
-                          (str (when display (format ":host{display:%s}\n" (name display)))))
-        style         (when style (str style "\n"))
-        tag-name      (str (when prefix (str (name prefix) "-")) (name tag))
-        style-sym     (gensym tag-name)
-        prop-names    (map name props)
-        attr-names    (keep #(when (:attr (meta %)) (name %)) props)
-        slot-names    (keep #(when (not (:default (meta %))) (name %)) slots)
-        dfl-slot-name (first (keep #(when (:default (meta %)) (name %)) slots))
-        this-sym      (gensym "this")
-        aget          'cljs.core/aget
-        prop-bind     (fn [x] [x (list aget (list aget this-sym "_props") (name x))])
-        slot-bind     (fn [x] [x (list aget (list aget this-sym "_slots") (name x))])]
+(defmacro deftag*
+  [tag
+   [this [& props] [& slots] [& callbacks] [& methods]]
+   & {:keys [import doc opts prefix style render]}]
+  (let [doc             (if doc [doc] [])
+        style           (if style [style] [])
+        css-imports     (mapv #(format "@import url(%s);" %) import)
+        css-defaults    []
+        style-body      (string/join "\n" (concat css-imports css-defaults style))
+        tag-name        (str (when prefix (str (name prefix) "-")) (name tag))
+        style-sym       (gensym tag-name)
+        prop-names      (map name props)
+        attr-names      (->> props (filter (any-meta :attr :form)) (map name))
+        slot-names      (->> slots (filter (not-meta :default)) (map name))
+        callback-names  (map name callbacks)
+        method-names    (map name methods)
+        form-value      (some-> (filter (any-meta :form) props) first name)
+        dfl-slot-name   (some-> (filter (any-meta :default) slots) first name)
+        this-sym        (gensym "this")
+        aget            'cljs.core/aget
+        js->clj         'cljs.core/js->clj
+        prop-bind       (fn [x] [x (list aget (list aget this-sym "_props") (name x))])
+        slot-bind       (fn [x] [x (list aget (list aget this-sym "_slots") (name x))])]
     `(do (deftemplate ~style-sym
-           ~(str "<style>\n" css-prelude "\n" style "</style>"))
+           ~(wrap-html :style style-body))
          (def ~tag
            ~@doc
            (custom-element*
-             ~tag-name
-             [~@prop-names]
-             [~@attr-names]
-             [~@slot-names]
-             ~dfl-slot-name
-             (fn [~this-sym]
-               (binding [*custom-element* ~this-sym]
-                 (let [~@(mapcat prop-bind props)
-                       ~@(mapcat slot-bind slots)
-                       ~connected (~aget ~this-sym "_connected")]
-                   (SHADOW-ROOT (~style-sym) ~render)))))))))
+             :tag           ~tag-name
+             :opts          ~(or opts {})
+             :attrs         [~@attr-names]
+             :props         [~@prop-names]
+             :callbacks     [~@callback-names]
+             :methods       [~@method-names]
+             :form-value    ~form-value
+             :named-slots   [~@slot-names]
+             :default-slot  ~dfl-slot-name
+             :render        (fn [~this-sym]
+                              (binding [*custom-element* ~this-sym]
+                                (let [~this ~this-sym
+                                      ~@(mapcat prop-bind props)
+                                      ~@(mapcat slot-bind slots)
+                                      {:strs [~@callbacks]}
+                                      (~js->clj (~aget ~this-sym "_callbacks"))
+                                      {:strs [~@methods]}
+                                      (~js->clj (~aget ~this-sym "_methods"))]
+                                  (SHADOW-ROOT (~style-sym) ~render)))))))))
 
 (defn defdeftag*
-  [skip import [tag & [display & more :as args]]]
-  (let [[display [bindings & [s & _ :as args]]]
-        (if (keyword? display) [display more] [nil args])
-        [style render] (if (string? s) args (cons nil args))
+  [skip import [tag & [maybe-doc & more :as args]]]
+  (let [[doc [maybe-opts & more :as args]]
+        (if (string? maybe-doc) [maybe-doc more] [nil args])
+        [opts [bindings & [maybe-style & more :as args]]]
+        (if (map? maybe-opts) [maybe-opts more] [nil args])
+        [style [render]]
+        (if (string? maybe-style) [maybe-style more] [nil args])
         prefix (-> *ns* str (string/split #"\.") (->> (drop skip) (string/join "-")))]
-    `(deftag ~tag
+    `(deftag* ~tag
        ~bindings
-       :prefix  ~prefix
        :import  ~import
-       :display ~display
+       :doc     ~doc
+       :opts    ~opts
+       :prefix  ~prefix
        :style   ~style
        :render  ~render)))
 
 (defmacro defdeftag
-  [name & {:keys [skip-ns-parts import]}]
+  [name & {:keys [skip-ns-parts css-imports]}]
   `(defmacro ~name
+     "Defines a web components custom element."
+     {:arglists '([tag doc? opts? [this [& props] [& slots] connected] style? render])}
      [~'& args#]
-     (defdeftag* ~(or skip-ns-parts 0) ~(or import #{}) args#)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; css ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro defstyles
-  [& kvs]
-  `(swap! styles merge ~(into {} (map vec (partition 2 kvs)))))
+     (defdeftag* ~(or skip-ns-parts 0) ~(or css-imports #{}) args#)))

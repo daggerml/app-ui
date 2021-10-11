@@ -3,9 +3,10 @@
     [daggerml.app.ui :refer [deftag]]
     [daggerml.ui :as ui]))
 
-(deftag MAIN :block
-  [[] [side content] _]
+(deftag MAIN
+  [_ [] [side content] [] []]
   "
+  :host { display: block; }
   #container {
   }
   #side {
@@ -26,10 +27,11 @@
     (ui/DIV :id "side"  (side))
     (ui/DIV :id "content" (content))))
 
-(deftag CENTERED :block
-  [[] [^:default content] _]
+(deftag CENTERED
+  [_ [] [^:default content] [] []]
   "
   :host {
+    display: block;
     height: 100%;
     width: 100%;
   }

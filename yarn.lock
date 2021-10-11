@@ -139,9 +139,9 @@ constants-browserify@^1.0.0:
   integrity sha1-wguW2MYXdIqvHBYCF2DNJ/y4y3U=
 
 core-util-is@~1.0.0:
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/core-util-is/-/core-util-is-1.0.2.tgz#b5fd54220aa2bc5ab57aab7140c940754503c1a7"
-  integrity sha1-tf1UIgqivFq1eqtxQMlAdUUDwac=
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/core-util-is/-/core-util-is-1.0.3.tgz#a6042d3634c2b27e9328f837b965fac83808db85"
+  integrity sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==
 
 create-ecdh@^4.0.0:
   version "4.0.4"
@@ -212,6 +212,11 @@ domain-browser@^1.1.1:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/domain-browser/-/domain-browser-1.2.0.tgz#3d31f50191a6749dd1375a7f522e823d42e54eda"
   integrity sha512-jnjyiM6eRyZl2H+W8Q/zLMA481hzi0eszAaBUzIVnmYVDBbnLxVNnfu1HgEBvCbL+71FrxMl3E6lpKH7Ge3OXA==
+
+element-internals-polyfill@^0.1.44:
+  version "0.1.44"
+  resolved "https://registry.yarnpkg.com/element-internals-polyfill/-/element-internals-polyfill-0.1.44.tgz#bdf62004e12c3bc2df5a8c98a29b4ae2bfca1c02"
+  integrity sha512-uqjKpuIqVJ4+tN6LiSdyVGGwSOjJr2j40u6PNPftXns0B9YLJ54zHwHcTQ3t0FOgbMi4nYrDMI0HwLRrqZAq7g==
 
 elliptic@^6.5.3:
   version "6.5.4"
@@ -523,10 +528,10 @@ shadow-cljs-jar@1.3.2:
   resolved "https://registry.yarnpkg.com/shadow-cljs-jar/-/shadow-cljs-jar-1.3.2.tgz#97273afe1747b6a2311917c1c88d9e243c81957b"
   integrity sha512-XmeffAZHv8z7451kzeq9oKh8fh278Ak+UIOGGrapyqrFBB773xN8vMQ3O7J7TYLnb9BUwcqadKkmgaq7q6fhZg==
 
-shadow-cljs@2.14.5:
-  version "2.14.5"
-  resolved "https://registry.yarnpkg.com/shadow-cljs/-/shadow-cljs-2.14.5.tgz#f71d9bf1e292d452ecc76ec0a061fdc895af36b5"
-  integrity sha512-+tn4f8bSD2P006bsuVAmQeBRSzNM55o2oPT2SfDYDcUYVuqevxnxuDc2xza+c2UsA55bnYezP71CSkFDC56Osw==
+shadow-cljs@2.15.11:
+  version "2.15.11"
+  resolved "https://registry.yarnpkg.com/shadow-cljs/-/shadow-cljs-2.15.11.tgz#f60c34a2466dd449da64f40f6646f6b66ca57e07"
+  integrity sha512-9a+rWi+r7a+u8CCUR/nCdfeCdCcJ2kZC7mrmGkwokMHhpnplVUzcgffGXxJWRSdQ4gMKV7B3CwqP/VxlGu9iCg==
   dependencies:
     node-libs-browser "^2.2.1"
     readline-sync "^1.4.7"
@@ -642,9 +647,9 @@ which@^1.3.1:
     isexe "^2.0.0"
 
 ws@^7.4.6:
-  version "7.5.0"
-  resolved "https://registry.yarnpkg.com/ws/-/ws-7.5.0.tgz#0033bafea031fb9df041b2026fc72a571ca44691"
-  integrity sha512-6ezXvzOZupqKj4jUqbQ9tXuJNo+BR2gU8fFRk3XCP3e0G6WT414u5ELe6Y0vtp7kmSJ3F7YWObSNr1ESsgi4vw==
+  version "7.5.5"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-7.5.5.tgz#8b4bc4af518cfabd0473ae4f99144287b33eb881"
+  integrity sha512-BAkMFcAzl8as1G/hArkxOxq3G7pjUqQ3gzYbLL0/5zNkph70e+lCoxBGnm6AW1+/aiNeV4fnKqZ8m4GZewmH2w==
 
 xtend@^4.0.0:
   version "4.0.2"

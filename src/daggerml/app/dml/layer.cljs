@@ -6,10 +6,11 @@
     [daggerml.cells :refer [cell cell=]]
     [daggerml.ui :as ui]))
 
-(deftag MAIN :block
-  [[] [^:default content] _]
+(deftag MAIN
+  [_ [] [^:default content] [] []]
   "
   :host {
+    display: block;
     height: 100vh;
     width: 100vw;
   }
@@ -55,10 +56,11 @@
     (ui/DIV :id "watermark" "DAGGERML")
     (ui/DIV :id "content" (content))))
 
-(deftag LOGIN :block
-  [[] [] connected?]
+(deftag LOGIN
+  [_ [] [] [] []]
   "
   :host {
+    display: block;
     height: 100vh;
     width: 100vw;
   }
@@ -86,25 +88,41 @@
     padding: 1em;
     padding-bottom: 0.5em;
   }
+  dml-control-input:invalid,
+  dml-control-input[internals-invalid] {
+    --blue-2: red;
+  }
   "
-  (let [email     (cell nil)
+  (let [dfl       (cell= {:email "user@example.com"})
+        email     (cell nil)
         password  (cell nil)
-        data      (cell= {:email @email :password @password})]
+        data      (cell= {:email @email :password @password})
+        errors    (cell (cycle [nil "uh oh"]))
+        error     (cell= (first @errors))]
+    (ui/with-interval 1000 (swap! errors next))
     (layout/CENTERED :id "container"
       (ui/DIV :id "form"
         (ui/DIV :id "title"
           (ui/B "Login"))
-        (ui/FORM
-          :submit #(do (.preventDefault %) (prn :data @data))
+        (control/FORM
+          :submit #(do (js/console.log
+                         "form:" (js/Object.fromEntries (js/FormData. @%)))
+                       (.reset @%))
           (control/TEXT
-            'label "Email"
-            'tabindex "1"
             'autofocus true
-            :bind ['state :keyup email])
+            :error error
+            :name "email"
+            :value (cell= (:email @dfl))
+            :tabindex "1"
+            :bind ['value :keyup email]
+            "Email")
           (control/PASSWORD
-            'label "Password"
-            :bind ['state :keyup password])
+            :name "password"
+            :value (cell= (:password @dfl))
+            :bind ['value :keyup password]
+            "Password")
           (control/CHECKBOX
-            'label " remember me on this device")
+            :name "remember"
+            " remember me on this device")
           (ui/HR)
-          (control/SUBMIT :click #(prn :data @data)))))))
+          (control/SUBMIT))))))

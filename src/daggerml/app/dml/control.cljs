@@ -4,9 +4,17 @@
     [daggerml.cells :refer [cell=]]
     [daggerml.ui :as ui]))
 
+(defn FORM
+  [& args]
+  (doto (apply ui/FORM args)
+    (ui/on! :submit #(.preventDefault %))))
+
 (deftag INPUT
-  [[label type autofocus tabindex state] [] connected?]
+  [this [type autofocus ^:form value] [^:default label] [connected disabled] [set-error]]
   "
+  :host {
+    outline: none;
+  }
   label {
     color: var(--blue-2);
   }
@@ -30,24 +38,37 @@
     outline: var(--yellow) solid 2px;
     outline-offset: 2px;
   }
+  input:disabled {
+    color: #666;
+    background-color: #eee;
+  }
+  input:invalid {
+    border-color: red;
+  }
   "
-  (ui/case= type
-    "submit"
-    (ui/INPUT
-      :type     type
-      :tabindex tabindex)
-    "checkbox"
-    (ui/LABEL
+  (let [submit!       #(some-> this .-form .requestSubmit)
+        enter-submit! #(when (= (.-key %) "Enter") (submit!))]
+    (ui/case= type
+      "submit"
       (ui/INPUT
-        :type     type
-        :tabindex tabindex)
-      label)
-    (ui/LABEL label
-      (ui/INPUT
-        :type     type
-        :tabindex tabindex
-        :bind     ['value :keyup state]
-        :focus    (cell= (-> (and @autofocus @connected?) (doto prn)))))))
+        :type       type
+        :disabled   disabled
+        :click      submit!)
+      "checkbox"
+      (ui/LABEL
+        (ui/INPUT
+          :type     type
+          :disabled disabled
+          :keyup    enter-submit!)
+        (label))
+      (ui/LABEL (label)
+        (ui/INPUT
+          :type     type
+          :disabled disabled
+          :autofocus true
+          :bind     ['value :keyup value]
+          :keyup    enter-submit!
+          :focus    (cell= (-> (and @autofocus @connected))))))))
 
 (defn TEXT
   [& attrs]

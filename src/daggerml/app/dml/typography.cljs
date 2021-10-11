@@ -5,7 +5,7 @@
     [daggerml.ui :refer [SPAN]]))
 
 (deftag ICON
-  [[title icon] [] _]
+  [_ [title icon] [] [] []]
   (SPAN
     :class "material-icons"
     :title title
