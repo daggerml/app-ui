@@ -15,7 +15,7 @@
     width: 100vw;
   }
   #container {
-    --size1: var(--design--grid-size);
+    --size1: var(--design-grid-size);
     --size2: calc(var(--size1) / 5);
     --size3: calc(var(--size1) - 2px);
     min-height: 100vh;
@@ -57,72 +57,22 @@
     (ui/DIV :id "content" (content))))
 
 (deftag LOGIN
-  [_ [] [] [] []]
+  [_ [] [email password remember submit] [] []]
   "
   :host {
     display: block;
     height: 100vh;
     width: 100vw;
+    --color: var(--primary-3);
   }
-  #container {
-  }
-  #form {
-    background-color: white;
-    border: 4px solid var(--blue-2);
-    border-radius: 6px;
-  }
-  #form #title {
-    padding: 1em;
-    background-color: var(--blue-2);
-    color: white;
-  }
-  hr {
-    border: 1px solid var(--blue-2);
-    width: 100%;
-    margin-bottom: 0.5em;
-  }
-  form {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-gap: 0.5em;
-    padding: 1em;
-    padding-bottom: 0.5em;
-  }
-  dml-control-input:invalid,
-  dml-control-input[internals-invalid] {
-    --blue-2: red;
+  ::slotted(*) {
   }
   "
-  (let [dfl       (cell= {:email "user@example.com"})
-        email     (cell nil)
-        password  (cell nil)
-        data      (cell= {:email @email :password @password})
-        errors    (cell (cycle [nil "uh oh"]))
-        error     (cell= (first @errors))]
-    (ui/with-interval 1000 (swap! errors next))
-    (layout/CENTERED :id "container"
-      (ui/DIV :id "form"
-        (ui/DIV :id "title"
-          (ui/B "Login"))
-        (control/FORM
-          :submit #(do (js/console.log
-                         "form:" (js/Object.fromEntries (js/FormData. @%)))
-                       (.reset @%))
-          (control/TEXT
-            'autofocus true
-            :error error
-            :name "email"
-            :value (cell= (:email @dfl))
-            :tabindex "1"
-            :bind ['value :keyup email]
-            "Email")
-          (control/PASSWORD
-            :name "password"
-            :value (cell= (:password @dfl))
-            :bind ['value :keyup password]
-            "Password")
-          (control/CHECKBOX
-            :name "remember"
-            " remember me on this device")
-          (ui/HR)
-          (control/SUBMIT))))))
+  (layout/CENTERED
+    (layout/PANEL
+      (ui/B :slot "title" "Login")
+      (layout/FORM-BODY :slot "content"
+        (email :slot "controls")
+        (password :slot "controls")
+        (remember :slot "controls")
+        (submit :slot "buttons")))))

@@ -5,14 +5,15 @@
            :type-mismatch
            {:level      :warning
             :namespaces {}}
-           :missing-docstring 
+           :missing-docstring
            {:level :off}
-           :unsorted-required-namespaces 
+           :unsorted-required-namespaces
            {:level :warning}
            :unresolved-symbol
            {:exclude []}}
  :lint-as {daggerml.cells/defc      clojure.core/def
            daggerml.cells/defc=     clojure.core/def
+           daggerml.ui/defstyle     clojure.core/def
            daggerml.ui/with-let     clojure.core/let}
  :output  {:exclude-files []}
  :hooks   {:analyze-call {daggerml.ui/defdeftag                   hooks.ui/defdeftag

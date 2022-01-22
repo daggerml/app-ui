@@ -1,11 +1,8 @@
 (ns daggerml.ui
   (:require-macros
-    [daggerml.ui :as ui :refer [guard with-let with-timeout]])
+    [daggerml.ui :as ui :refer [guard with-let]])
   (:require
-    ["element-internals-polyfill"]
-    [daggerml.cells :as c :refer [cell cell? cell= do-watch]]
-    [goog.dom.classlist :as domcl]
-    [goog.events :as events]))
+    [daggerml.cells :as c :refer [cell cell? cell= do-watch]]))
 
 (declare bind ->node do! element on! SLOT)
 
@@ -14,14 +11,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def ^:dynamic *custom-element* nil)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; shadow-cljs hooks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn ^:dev/before-load before-load
-  []
-  (.reload js/location))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -62,17 +51,9 @@
           :else               (do (.insertBefore elem new-kid old-kid)
                                   (recur nks old-kids)))))))
 
-(defn- prop?
-  [x]
-  (or (keyword? x) (symbol? x)))
-
-(defn- get-prop
-  [e k]
-  (if (keyword? k) (.getAttribute e (name k)) (aget e (name k))))
-
-(defn- set-prop
-  [e k v]
-  ((get-method do! ::default) e k (get-prop e k) v))
+(defn- prop?    [x]     (or (keyword? x) (symbol? x)))
+(defn- get-prop [e k]   (if (keyword? k) (.getAttribute e (name k)) (aget e (name k))))
+(defn- set-prop [e k v] ((get-method do! ::default) e k (get-prop e k) v))
 
 (defn- parse-args
   [args]
@@ -106,17 +87,23 @@
       (when-not (already-defined-props prop)
         (define-property! the-class prop getter)))))
 
+(def add-event-listener-supports-options?
+  (let [options #js {}
+        support (atom false)
+        getter  (fn [] (reset! support true) false)]
+    (guard
+      (js/Object.defineProperty options "passive" #js {:get getter})
+      (js/window.addEventListener "test" nil options)
+      (js/window.removeEventListener "test" nil options))
+    @support))
+
 (defn- slot-cell
   [& [slot-name]]
   (let [c (cell [])
         s (if slot-name (SLOT {:name slot-name}) (SLOT))
         f #(reset! c (into [] (array-seq (.assignedElements s))))]
     (on! s :slotchange f)
-    (specify! c
-      IFn
-      (-invoke
-        ([this] s)
-        ([this a] (doto s (element [a])))))))
+    (ui/specify-ifn! c (fn [_ & args] (doto s (element args))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; protocols ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -182,45 +169,16 @@
   cljs.core/IDeref
   (-deref [this] (.-target this)))
 
-(extend-type events/BrowserEvent
-  cljs.core/IDeref
-  (-deref [this] (.-target this)))
-
-(defn element?
-  [this]
-  (and
-    (instance? js/Element this)
-    (satisfies? IDomElement this)))
-
-(defn native?
-  [elem]
-  (and
-    (instance? js/Element elem)
-    (not (element? elem))))
-
-(defn native-node?
- [node]
- (and
-  (instance? js/Node node)
-  (not (element? node))))
-
-
-(defn node? [this]
-  (satisfies? IDomNode this))
-
-(defn ->node
-  [x]
-  (if (node? x) (-node x) x))
-
-(defn name*
-  [x]
-  (try (name x) (catch js/Error _ (str x))))
+(defn node?   [this]  (satisfies? IDomNode this))
+(defn ->node  [x]     (if (node? x) (-node x) x))
+(defn name*   [x]     (try (name x) (catch js/Error _ (str x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; multimethods ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmulti do! (fn [_e k _v _v'] k) :default ::default)
+(defmulti do! (fn [_e k _v _v'] k)  :default ::default)
+(defmulti on! (fn [_e k _f] k)      :default ::default)
 
 (defmethod do! ::default
   [e k _v v']
@@ -231,37 +189,11 @@
             :else       (.setAttribute e k v')))
     (aset e (name k) v')))
 
-(defn- normalize-class
-  [x]
-  (cond (map? x)    (reduce-kv #(assoc %1 (name %2) %3) {} x)
-        (seq? x)    (zipmap (map name x) (repeat true))
-        (string? x) (zipmap (.split x #"\s+") (repeat true))
-        :else       {}))
-
-(defmethod do! :class
-  [e _ v v']
-  (let [p (normalize-class v)
-        q (normalize-class v')]
-    (doseq [k (reduce into #{} (map keys [p q]))]
-      (domcl/enable e k (boolean (q k))))))
-
-(defmethod do! :focus
-  [e _ _ v']
-  (when v' (with-timeout 0 (guard (doto e .focus .select)))))
-
-(defmethod do! :error
-  [e _ _ v']
-  (.setError ^js e v'))
-
-(defmethod do! :bind
-  [e _ _ [k' e' c']]
-  (bind e k' e' c'))
-
-(defmulti on! (fn [_e k _f] k) :default ::default)
-
 (defmethod on! ::default
   [e k f]
-  (events/listen e (name k) f))
+  (let [{:keys [capture] :as opts} (meta f)
+        opts (if add-event-listener-supports-options? opts (boolean capture))]
+    (.addEventListener e (name k) f (clj->js opts))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; built-in element constructors ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -324,18 +256,21 @@
         (set! (.-innerHTML tpl) body-text)
         #(.cloneNode (.-content tpl) true)))))
 
+(defn define-style-template
+  [styles]
+  (define-template (str "<style>" styles "</style>")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; custom element definition ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn custom-element*
-  [& {:keys [tag opts attrs props callbacks methods form-value named-slots default-slot render]}]
+(defn custom-element
+  [& {:keys [tag attrs props callbacks methods form-value named-slots default-slot render]}]
   (let [tag (.toLowerCase tag)
         the-class
         (js*
           "
           (function() {
-            const $opts       = ~{};
             const $formVal    = ~{};
             const $reset      = ~{};
             const $deref      = ~{};
@@ -439,7 +374,12 @@
                       this['_internals']['setFormValue'](v);
                     });
                   }
-                  $render(this);
+                  $render(this, {
+                    props: this['_props'],
+                    slots: this['_slots'],
+                    callbacks: this['_callbacks'],
+                    methods: this['_methods'],
+                  });
                 }
               }
 
@@ -491,7 +431,6 @@
             };
           })();
           "
-          (clj->js opts)
           form-value
           reset!
           deref
@@ -505,7 +444,9 @@
           default-slot
           (into-array callbacks)
           (into-array methods)
-          render)]
+          (fn [this hooks]
+            (binding [*custom-element* this]
+              (render this hooks))))]
     (doseq [prop props]
       (define-property! the-class prop
         (fn [this] @(aget (aget this "_props") prop))
@@ -546,4 +487,10 @@
   [elem k e c]
   (with-let [_ elem]
     (do-watch c #(set-prop elem k %2))
-    (events/listen elem (name e) #(reset! c (get-prop elem k)))))
+    (on! elem e #(reset! c (get-prop elem k)))))
+
+(defn form-data
+  ([form]
+   (form-data form false))
+  ([form keywordize-keys]
+   (some-> form js/FormData. js/Object.fromEntries (js->clj :keywordize-keys keywordize-keys))))

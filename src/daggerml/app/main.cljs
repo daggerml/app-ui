@@ -1,16 +1,19 @@
 (ns daggerml.app.main
   (:require
+    ["element-internals-polyfill"]
     ["webfontloader" :as wfl]
     [daggerml.app.db.routes :as r]
     [daggerml.app.dml.layer :as layer]
     [daggerml.app.dml.layout :as layout]
     [daggerml.app.dml.nav :as nav]
     [daggerml.app.dml.nav.icon :as nav-icon]
+    [daggerml.app.dml.panel :as panel]
     [daggerml.cells :as c :refer [cell=]]
-    [daggerml.ui :as ui]))
+    [daggerml.ui :as ui]
+    [daggerml.ui.attributes]))
 
-(wfl/load
-  (clj->js {:custom {:families ["VT323" "Material Icons"]}}))
+(defn ^:dev/before-load before-load [] (.reload js/location))
+(wfl/load (clj->js {:custom {:families ["VT323" "Material Icons"]}}))
 
 (defn -main
   []
@@ -31,5 +34,5 @@
           (nav-icon/SUPPORT)))
       (layer/MAIN :slot "content"
         (ui/case= (cell= (:name @r/route))
-          ::r/home (layer/LOGIN)
+          ::r/home (panel/LOGIN)
           nil)))))

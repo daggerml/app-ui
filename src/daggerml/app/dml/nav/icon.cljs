@@ -6,50 +6,63 @@
     [daggerml.cells :as c :refer [cell=]]
     [daggerml.ui :as ui]))
 
-(deftag BASE
-  [_ [title route icon theme] [] [] []]
+(deftag ICON
+  [_ [title route icon] [] [] []]
   "
-  :host { display: block; }
+  :host {
+    display:      block;
+    --fg-color:   white;
+    --bg-shadow:  black;
+    --bg-color:   var(--nav-bg-color);
+    --bg-hover:   var(--nav-bg-hover);
+    --bg-active:  var(--nav-bg-active);
+  }
   a {
     display: block;
     width: 100%;
     padding: 0.5em 1em;
-    color: white;
-    transition: background 0.5s, border 0.5s;
+    color: var(--fg-color);
+    transition: background 0.25s ease-in-out;
   }
-  a:focus         { outline: 0; }
-  a:active        { transition: background-color 0s; }
-  a.norm, a.norm.selected:hover, a.norm.selected:active {
-    background-color: var(--nav--bg-norm);
-  }
-  a.home          { background-color: var(--nav--bg-home); }
-  a.norm:hover    { background-color: var(--nav--bg-norm--hover); }
-  a.norm:active   { background-color: var(--nav--bg-norm--active); }
-  a.home:hover    { background-color: var(--nav--bg-home--hover); }
-  a.home:active   { background-color: var(--nav--bg-home--active); }
-  a.norm.selected { box-shadow: inset 0 0 15px black; }
+  a:focus           { outline: 0; }
+  a:active          { transition: background-color 0.1s ease-in-out; }
+  a,
+  a.selected:hover,
+  a.selected:active { background-color: var(--bg-color); }
+  a:hover           { background-color: var(--bg-hover); }
+  a:active          { background-color: var(--bg-active); }
+  a.selected        { box-shadow: inset 0 0 15px var(--bg-shadow); }
   "
   (ui/A
     :tabindex "-1"
     :href     (cell= (r/href @route))
-    :class    (cell= {(or @theme :norm) true :selected (= @route (:name @r/route))})
+    :class    (cell= {:selected (= @route (:name @r/route))})
     (ui/B (typo/ICON 'title title 'icon icon))))
 
-(defn- icon
-  ([route title icon-name]
-   (icon route title icon-name nil))
-  ([route title icon-name theme]
-   (BASE 'route route 'title title 'icon icon-name 'theme theme)))
+(deftag HOME
+  [_ [] [] [] []]
+  "
+  * {
+    --bg-shadow:  transparent;
+    --bg-color:   var(--nav-home-color);
+    --bg-hover:   var(--nav-home-hover);
+    --bg-active:  var(--nav-home-active);
+  }
+  "
+  (ICON 'route ::r/home 'title "home" 'icon "home"))
 
-(defn LOGOUT
-  []
-  (BASE
+(deftag LOGOUT
+  [_ [] [] [] []]
+  (ICON
     'route ::none
     'title "logout"
     'icon "logout"
     :click #(do (prn :logged-out) (.preventDefault %))))
 
-(deftag HOME        [_ [] [] [] []] (icon ::r/home "home"        "home"                "home"))
+(defn- icon
+  [route title icon-name]
+  (ICON 'route route 'title title 'icon icon-name))
+
 (deftag DASHBOARDS  [_ [] [] [] []] (icon ::r/dash "dashboards"  "dashboard"))
 (deftag DAGS        [_ [] [] [] []] (icon ::r/dags "DAGs"        "account_tree"))
 (deftag ANALYTICS   [_ [] [] [] []] (icon ::r/anal "analytics"   "area_chart"))

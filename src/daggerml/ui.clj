@@ -1,5 +1,7 @@
 (ns daggerml.ui
   (:require
+    [clojure.java.io :as io]
+    [clojure.pprint]
     [clojure.string :as string]))
 
 (def ^:private deref*   'daggerml.cells/deref*)
@@ -7,6 +9,20 @@
 (def ^:private cell-let 'daggerml.cells/cell-let)
 
 ;; helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- gen-ifn-nonvariadic-arities [f]
+  (for [arity (range 1 21),
+        :let [args (repeatedly arity gensym)]]
+    `([~@args] (~f ~@args))))
+
+(defn- gen-ifn-variadic-arity [f]
+  (let [args (repeatedly 22 gensym)]
+    `([~@args] (apply ~f ~@args))))
+
+(defn- gen-ifn-invoke [f]
+  `(~'-invoke
+     ~@(gen-ifn-nonvariadic-arities f)
+     ~(gen-ifn-variadic-arity f)))
 
 (defn- any-meta
   [& ks]
@@ -16,11 +32,19 @@
   [& ks]
   (complement (apply any-meta ks)))
 
-(defn- wrap-html
-  [tag content]
-  (format "<%s>\n%s\n</%s>" (name tag) content (name tag)))
+(defn- make-tag-name
+  [skip tag]
+  (-> *ns* str (string/split #"\.") (conj (name tag)) (->> (drop skip) (string/join "-"))))
 
 ;; macros ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro aget-in
+  [obj & ks]
+  `(some-> ~obj ~@(map (fn [x] `(cljs.core/aget ~(name x))) ks)))
+
+(defmacro resource-str
+  [path]
+  (some-> path io/resource slurp))
 
 (defmacro guard
   [& body]
@@ -30,6 +54,26 @@
   [protocol [& types] & protocol-methods]
   `(extend-protocol ~protocol
      ~@(mapcat #(into [%] protocol-methods) types)))
+
+(defmacro extend-protocol-ifn
+  [type f]
+  `(cljs.core/extend-protocol cljs.core/IFn
+     ~type
+     ~(gen-ifn-invoke f)))
+
+(defmacro extend-type-ifn
+  [type f]
+  `(cljs.core/extend-type ~type
+     cljs.core/IFn
+     ~(gen-ifn-invoke f)))
+
+(defmacro specify-ifn!
+  [obj f]
+  (let [f' (gensym "f")]
+    `(let [~f' ~f]
+       (cljs.core/specify! ~obj
+         cljs.core/IFn
+         ~(gen-ifn-invoke f')))))
 
 (defmacro with-let
   [[name value & bindings] & body]
@@ -95,17 +139,25 @@
   [name inner-html]
   `(def ~name (define-template ~inner-html)))
 
-(defmacro deftag*
-  [tag
-   [this [& props] [& slots] [& callbacks] [& methods]]
-   & {:keys [import doc opts prefix style render]}]
-  (let [doc             (if doc [doc] [])
-        style           (if style [style] [])
-        css-imports     (mapv #(format "@import url(%s);" %) import)
-        css-defaults    []
-        style-body      (string/join "\n" (concat css-imports css-defaults style))
-        tag-name        (str (when prefix (str (name prefix) "-")) (name tag))
-        style-sym       (gensym tag-name)
+(defmacro defstyle
+  [name style-body]
+  `(def ~name (define-style-template ~style-body)))
+
+(defmacro deftag
+  {:arglists '([tag doc? opts? [this [& props] [& slots] [& callbacks] [& methods]] style? & body])}
+  [tag & [doc? & more :as xs]]
+  (let [[doc [opts? & more :as xs]]                 (if (string? doc?)    [[doc?] more]   [[] xs])
+        [opts [bindings & [style? & more :as xs]]]  (if (map? opts?)      [opts? more]    [{} xs])
+        [style body]                                (if (string? style?)  [[style?] more] [[] xs])
+        [this [& props] [& slots] [& callbacks] [& methods]] bindings
+        default-opts    {:skip-ns-parts 0 :css-imports #{} :style-templates #{}}
+        opts            (merge default-opts (:daggerml.ui/options (meta tag)) opts)
+        tag-name        (make-tag-name (:skip-ns-parts opts) tag)
+        css-imports     (mapv #(format "@import url(%s);" %) (:css-imports opts))
+        style-templates (mapv list (:style-templates opts))
+        style-body      (string/join "\n" (concat css-imports style))
+        template-sym    (gensym (str tag-name "-style"))
+        hook-sym        (gensym "hooks")
         prop-names      (map name props)
         attr-names      (->> props (filter (any-meta :attr :form)) (map name))
         slot-names      (->> slots (filter (not-meta :default)) (map name))
@@ -113,18 +165,12 @@
         method-names    (map name methods)
         form-value      (some-> (filter (any-meta :form) props) first name)
         dfl-slot-name   (some-> (filter (any-meta :default) slots) first name)
-        this-sym        (gensym "this")
-        aget            'cljs.core/aget
-        js->clj         'cljs.core/js->clj
-        prop-bind       (fn [x] [x (list aget (list aget this-sym "_props") (name x))])
-        slot-bind       (fn [x] [x (list aget (list aget this-sym "_slots") (name x))])]
-    `(do (deftemplate ~style-sym
-           ~(wrap-html :style style-body))
+        hook-bind       (fn [hooks k] (fn [sym] [sym `(aget-in ~hooks ~(name k) ~(name sym))]))]
+    `(do (defstyle ~template-sym ~style-body)
          (def ~tag
            ~@doc
-           (custom-element*
+           (custom-element
              :tag           ~tag-name
-             :opts          ~(or opts {})
              :attrs         [~@attr-names]
              :props         [~@prop-names]
              :callbacks     [~@callback-names]
@@ -132,39 +178,25 @@
              :form-value    ~form-value
              :named-slots   [~@slot-names]
              :default-slot  ~dfl-slot-name
-             :render        (fn [~this-sym]
-                              (binding [*custom-element* ~this-sym]
-                                (let [~this ~this-sym
-                                      ~@(mapcat prop-bind props)
-                                      ~@(mapcat slot-bind slots)
-                                      {:strs [~@callbacks]}
-                                      (~js->clj (~aget ~this-sym "_callbacks"))
-                                      {:strs [~@methods]}
-                                      (~js->clj (~aget ~this-sym "_methods"))]
-                                  (SHADOW-ROOT (~style-sym) ~render)))))))))
+             :render        (fn [~this ~hook-sym]
+                              (let [~@(mapcat (hook-bind hook-sym "props") props)
+                                    ~@(mapcat (hook-bind hook-sym "slots") slots)
+                                    ~@(mapcat (hook-bind hook-sym "callbacks") callbacks)
+                                    ~@(mapcat (hook-bind hook-sym "methods") methods)]
+                                (SHADOW-ROOT ~@style-templates (~template-sym) ~@body))))))))
 
-(defn defdeftag*
-  [skip import [tag & [maybe-doc & more :as args]]]
-  (let [[doc [maybe-opts & more :as args]]
-        (if (string? maybe-doc) [maybe-doc more] [nil args])
-        [opts [bindings & [maybe-style & more :as args]]]
-        (if (map? maybe-opts) [maybe-opts more] [nil args])
-        [style [render]]
-        (if (string? maybe-style) [maybe-style more] [nil args])
-        prefix (-> *ns* str (string/split #"\.") (->> (drop skip) (string/join "-")))]
-    `(deftag* ~tag
-       ~bindings
-       :import  ~import
-       :doc     ~doc
-       :opts    ~opts
-       :prefix  ~prefix
-       :style   ~style
-       :render  ~render)))
+(defn emit-deftag
+  [options [tag & args]]
+  `(deftag ~(vary-meta tag assoc :daggerml.ui/options options) ~@args))
 
 (defmacro defdeftag
-  [name & {:keys [skip-ns-parts css-imports]}]
-  `(defmacro ~name
-     "Defines a web components custom element."
-     {:arglists '([tag doc? opts? [this [& props] [& slots] connected] style? render])}
-     [~'& args#]
-     (defdeftag* ~(or skip-ns-parts 0) ~(or css-imports #{}) args#)))
+  "Defines a macro which calls daggerml.ui/deftag with the given options."
+  {:arglists '([name doc? options?])}
+  [name & [doc? & more :as xs]]
+  (let [[doc [options]] (if (string? doc?) [doc? more] [nil xs])
+        {doc' :doc :keys [arglists]} (meta #'deftag)]
+    `(defmacro ~name
+       ~@(or doc doc')
+       {:arglists '~arglists}
+       [~'& args#]
+       (emit-deftag ~options args#))))

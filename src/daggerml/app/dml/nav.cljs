@@ -1,6 +1,5 @@
 (ns daggerml.app.dml.nav
   (:require
-    [daggerml.cells :refer [cell=]]
     [daggerml.app.ui :refer [deftag]]
     [daggerml.ui :as ui]))
 
@@ -10,6 +9,8 @@
   :host {
     display: block;
     height: 100vh;
+    --bg-shadow: var(--shadow);
+    --bg-color: var(--nav-bg-color);
   }
   #container {
     display: grid;
@@ -19,8 +20,8 @@
     height: 100%;
     width: 100%;
     z-index: 100;
-    box-shadow: 0 0 5px var(--shadow);
-    background-color: var(--nav--bg-norm);
+    box-shadow: 0 0 5px var(--bg-shadow);
+    background-color: var(--bg-color);
   }
   #footer {
     align-self: end;
