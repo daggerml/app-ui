@@ -35,4 +35,14 @@
       (layer/MAIN :slot "content"
         (ui/case= (cell= (:name @r/route))
           ::r/home (panel/LOGIN)
+          ::r/dags (layout/HBOX-2
+                     :style "--col1-width: 300px; --gap:0;min-height:100%;"
+                     (ui/DIV
+                       :style "background-color:#aaa;min-height:100%;"
+                       :slot "col1"
+                       "left")
+                     (ui/DIV
+                       :style "background-color:#ccc;min-height:100%;"
+                       :slot "col2"
+                       (doall (repeatedly 10 #(ui/DIV "right")))))
           nil)))))

@@ -20,4 +20,5 @@
                           daggerml.ui/defnative-element-factories hooks.ui/defnative-element-factories
                           daggerml.ui/extend-protocol*            hooks.ui/extend-protocol*
                           daggerml.app.ui/deftag                  hooks.ui/deftag
+                          daggerml.ui/->css                       hooks.ui/ignore
                           cljs.core/specify!                      hooks.ui/specify!}}}

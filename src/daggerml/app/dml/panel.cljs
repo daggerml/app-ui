@@ -1,8 +1,9 @@
 (ns daggerml.app.dml.panel
   (:require
     [daggerml.app.dml.control :as control]
-    [daggerml.app.dml.layer :as layer]
-    [daggerml.ui :as ui]))
+    [daggerml.app.dml.layer   :as layer]
+    [daggerml.app.dml.layout  :as layout]
+    [daggerml.ui              :as ui]))
 
 (ui/defstyle login-styles
   "

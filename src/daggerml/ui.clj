@@ -36,6 +36,23 @@
   [skip tag]
   (-> *ns* str (string/split #"\.") (conj (name tag)) (->> (drop skip) (string/join "-"))))
 
+(defn- ->css*
+  [x]
+  (cond (nil? x)      x
+        (string? x)   x
+        (number? x)   (str x)
+        (keyword? x)  (str (if (namespace x) ":" "") (name x))
+        (symbol? x)   (name x)))
+
+(defn- ->css
+  [x]
+  (-> (fn [xs k v]
+        (if (map? v)
+          (str xs (->css* k) "{" (->css v) "}\n")
+          (str xs (->css* k) ":" (->css* v) ";")))
+      (reduce-kv "" x)
+      (->> (apply str))))
+
 ;; macros ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro aget-in
@@ -146,9 +163,11 @@
 (defmacro deftag
   {:arglists '([tag doc? opts? [this [& props] [& slots] [& callbacks] [& methods]] style? & body])}
   [tag & [doc? & more :as xs]]
-  (let [[doc [opts? & more :as xs]]                 (if (string? doc?)    [[doc?] more]   [[] xs])
-        [opts [bindings & [style? & more :as xs]]]  (if (map? opts?)      [opts? more]    [{} xs])
-        [style body]                                (if (string? style?)  [[style?] more] [[] xs])
+  (let [[doc [opts? & more :as xs]]                 (if (string? doc?)      [[doc?] more]   [[] xs])
+        [opts [bindings & [style? & more :as xs]]]  (if (map? opts?)        [opts? more]    [{} xs])
+        [style body]                                (cond (string? style?)  [[style?] more]
+                                                          (map? style?)     [[(->css style?)] more]
+                                                          :else             [[] xs])
         [this [& props] [& slots] [& callbacks] [& methods]] bindings
         default-opts    {:skip-ns-parts 0 :css-imports #{} :style-templates #{}}
         opts            (merge default-opts (:daggerml.ui/options (meta tag)) opts)
@@ -200,3 +219,4 @@
        {:arglists '~arglists}
        [~'& args#]
        (emit-deftag ~options args#))))
+

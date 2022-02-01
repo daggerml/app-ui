@@ -23,6 +23,10 @@
 
 ;; hooks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn ignore
+  [& _]
+  {:node (sexpr->node nil)})
+
 (defn specify!
   [{:keys [node]}]
   (let [[_ _ & args] (api/sexpr node)]

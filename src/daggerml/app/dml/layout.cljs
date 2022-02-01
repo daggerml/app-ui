@@ -6,50 +6,51 @@
 
 (deftag MAIN
   [_ [] [side content] [] []]
-  "
-  :host { display: block; }
-  #container {
-  }
-  #side {
-    position: fixed;
-    height: 100vh;
-    width: var(--main-layout-side-width);
-    top: 0;
-    left: 0;
-    z-index: 100;
-  }
-  #content {
-    width: 100vw;
-    min-height: 100vh;
-    z-index: 10;
-  }
-  "
+
+  {":host"
+   {display       block}
+
+   "#container"
+   {}
+
+   "#side"
+   {position      fixed
+    height        :100vh
+    width         "var(--main-layout-side-width)"
+    top           0
+    left          0
+    z-index       100}
+
+   "#content"
+   {width         :100vw
+    height        :100vh
+    z-index       10}}
+
   (ui/DIV :id "container"
     (ui/DIV :id "side"  (side))
     (ui/DIV :id "content" (content))))
 
 (deftag CENTERED
   [_ [] [^:default content] [] []]
-  "
-  :host {
-    display: block;
-    height: 100%;
-    width: 100%;
-  }
-  #container {
-    display: grid;
-    grid-template-columns: 1fr min-content 1fr;
-    grid-template-rows: 1fr min-content 1fr;
-    justify-items: center;
-    align-items: center;
-    height: 100%;
-    width: 100%;
-  }
-  #content {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  "
+
+  {":host"
+   {display               block
+    height                :100%
+    width                 :100%}
+
+   "#container"
+   {display               grid
+    grid-template-columns "1fr min-content 1fr"
+    grid-template-rows    "1fr min-content 1fr"
+    justify-items         center
+    align-items           center
+    height                :100%
+    width                 :100%}
+
+   "#content"
+   {grid-column           2
+    grid-row              2}}
+
   (ui/DIV :id "container"
     (ui/DIV :id "content"
       (content))))
@@ -71,6 +72,36 @@
   }
   "
   (ui/DIV :id "container" (content)))
+
+(deftag HBOX-2
+  [this [] [col1 col2] [] []]
+
+  {":host"
+   {display               block
+    --gap                 0
+    --padding             0
+    --col1-width          :300px}
+
+   "#container"
+   {height                :100%
+    display               grid
+    overflow              hidden
+    padding-left          "var(--main-layout-side-width)"
+    grid-template-columns "var(--col1-width) 1fr"
+    grid-template-rows    :100%
+    grid-gap              "var(--gap)"}
+
+   "#col1, #col2"
+   {width                 :100%
+    height                :100%
+    padding               0
+    overflow              auto}
+
+   }
+
+  (ui/DIV :style "height:100%;" :id "container"
+    (ui/DIV :style "height:100%;" :id "col1" (col1))
+    (ui/DIV :style "height:100%;" :id "col2" (col2))))
 
 (deftag PANEL
   [this [] [title content] [] []]
