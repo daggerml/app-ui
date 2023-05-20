@@ -1,0 +1,110 @@
+:root {
+  --root-foreground-color: #ffffff;
+  --root-background-color: #112233;
+  --secondary-background-color: #221133;
+  --mobile-nav-height: 4em;
+}
+
+html, body
+{
+  margin: 0 auto;
+  padding: 0;
+  color: var(--root-foreground-color);
+  background-color: var(--root-background-color);
+}
+
+a
+{
+  color: currentcolor;
+}
+
+a:hover
+{
+  color: cyan;
+}
+
+#container
+{
+  display: grid;
+  grid-template-columns: 1fr 40ch 120ch 40ch 1fr;
+}
+
+#left
+{
+  background-color: var(--secondary-background-color);
+}
+
+#left > div
+{
+  background-color: var(--secondary-background-color);
+}
+
+#right > div
+{
+  background-color: var(--secondary-background-color);
+}
+
+#left-narrow
+{
+  display: none;
+}
+
+#left > div, #right > div
+{
+  position: fixed;
+}
+
+#center
+{
+}
+
+#right
+{
+  background-color: var(--secondary-background-color);
+}
+
+@media (max-width: 200ch) {
+
+  #left-wide
+  {
+    display: none;
+  }
+
+  #left-narrow
+  {
+    display: block;
+  }
+
+  #left > div
+  {
+    position: relative;
+    width: 100%;
+    height: var(--mobile-nav-height);
+  }
+
+  #container
+  {
+    grid-template-columns: 1fr;
+  }
+
+  #center
+  {
+    max-width: 120ch;
+    margin: 0 auto;
+  }
+
+  #right
+  {
+    display: none;
+  }
+
+}
+
+@media (max-width: 120ch) {
+
+  #center
+  {
+    width: 100%;
+  }
+
+}
