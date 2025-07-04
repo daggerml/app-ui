@@ -6,6 +6,7 @@ from flask import Flask, jsonify, render_template, request, url_for
 
 from dml_ui.app.util import get_dag_info, get_node_info
 from dml_ui.cloudwatch import CloudWatchLogs
+from dml_ui.plugins import discover_plugins
 
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
@@ -116,6 +117,25 @@ def get_logs():
         start_from_head=True
     )
     return jsonify(logs)
+
+@app.route("/plugins/<string:plugin_name>")
+def plugins(plugin_name):
+    """
+    Discover and list all available dashboard plugins.
+    """
+    plugins = [x for x in discover_plugins() if x.NAME == plugin_name]
+    if not plugins:
+        return jsonify({"error": f"Plugin {plugin_name} not found"}), 404
+    if len(plugins) > 1:
+        return jsonify({"error": f"Multiple plugins found with name {plugin_name}"}), 500
+    plugin = plugins[0]
+    dml = Dml()
+    repo = request.args.get("repo")
+    branch = request.args.get("branch")
+    dag_id = request.args.get("dag_id")
+    dag_data = get_dag_info(dml, dag_id)
+    rendered_html = plugin.render(dag_data, repo=repo, branch=branch, dag_id=dag_id)
+    return render_template("plugin.html", plugin=plugin, rendered_html=rendered_html, dag_data=dag_data)
 
 @app.route("/idx")
 def idx():

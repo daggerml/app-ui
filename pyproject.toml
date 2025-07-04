@@ -26,14 +26,28 @@ classifiers = [
 ]
 dependencies = []
 
+# optional dependencies
+[project.optional-dependencies]
+plot = [
+  "matplotlib>=3.4.0",
+  "seaborn>=0.11.0",
+  "plotly==6.2.0",
+  "altair>=5.5.0",
+  "vegafusion>=2.0.2",
+  "bokeh>=3.7.3",
+]
+
 [project.urls]
-Documentation = "https://github.com/Aaron Niskin/dml-ui#readme"
-Issues = "https://github.com/Aaron Niskin/dml-ui/issues"
-Source = "https://github.com/Aaron Niskin/dml-ui"
+Documentation = "https://github.com/daggerml/dml-ui#readme"
+Issues = "https://github.com/daggerml/dml-ui/issues"
+Source = "https://github.com/daggerml/dml-ui"
 
 # script entry points
 [project.scripts]
 dml-ui-dev = "dml_ui.app.impl:run"
+
+[project.entry-points."dml_ui.dashboard_plugins"]
+my_matplotlib_plugin = "dml_util.plugins:MatplotlibStatsPlugin"
 
 [tool.hatch.version]
 path = "src/dml_ui/__about__.py"
@@ -44,6 +58,7 @@ extra-dependencies = [
   # github dependencies on branch: "main" with features: dml,nb,app,test
   "dml-util[dml,nb,app,test] @ git+https://github.com/daggerml/dml-util.git@simplify-tests",
 ]
+features = ["plot"]
 [tool.hatch.envs.default.scripts]
 check = "mypy --install-types --non-interactive {args:src/dml_ui tests}"
 
