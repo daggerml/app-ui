@@ -47,7 +47,7 @@ Source = "https://github.com/daggerml/dml-ui"
 dml-ui-dev = "dml_ui.app.impl:run"
 
 [project.entry-points."dml_ui.dashboard_plugins"]
-my_matplotlib_plugin = "dml_util.plugins:MatplotlibStatsPlugin"
+my_matplotlib_plugin = "dml_ui.plugins:MatplotlibStatsPlugin"
 
 [tool.hatch.version]
 path = "src/dml_ui/__about__.py"

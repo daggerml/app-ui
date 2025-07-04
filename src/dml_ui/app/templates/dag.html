@@ -44,6 +44,17 @@
       margin-right: 10px;
       background-color: var(--bs-primary);
     }
+    .code-container {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .code-container pre {
+      border-radius: 0;
+      max-height: none;
+    }
+    .code-container .card-body {
+      background-color: var(--bs-gray-100);
+    }
   </style>
 {% endblock %}
 
@@ -124,7 +135,16 @@
     </div>
     {% if script %}
     <div class="tab-pane fade" id="code" role="tabpanel" aria-labelledby="code-tab">
-      <pre><code class="language-python">{{ script }}</code></pre>
+      <div class="container-fluid">
+        <div class="card code-container">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Executed Code</h5>
+          </div>
+          <div class="card-body p-0">
+            <pre class="mb-0"><code class="language-python">{{ script }}</code></pre>
+          </div>
+        </div>
+      </div>
     </div>
     {% endif %}
     {% if log_streams %}
@@ -172,7 +192,16 @@
     {% endif %}
     {% if result %}
     <div class="tab-pane fade" id="result" role="tabpanel" aria-labelledby="result-tab">
-      <pre><code class="language-python">{{ result }}</code></pre>
+      <div class="container-fluid">
+        <div class="card code-container">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Result</h5>
+          </div>
+          <div class="card-body p-0">
+            <pre class="mb-0"><code class="language-python">{{ result }}</code></pre>
+          </div>
+        </div>
+      </div>
     </div>
     {% endif %}
     {% if html_uri %}

@@ -33,7 +33,6 @@ def dag_route():
     dropdowns = get_dropdowns(dml, repo, branch, dag_id)
     data = get_dag_info(dml, dag_id)
     data.pop("argv", None)
-    # data.update(data.pop("result", {}))
     log_streams = data.pop("log_streams", {})
     dag_data = data.pop("dag_data")
     for node in dag_data["nodes"]:
@@ -60,7 +59,49 @@ def dag_route():
                     ]
                     for x in node["sublist"]
                 ]
-    return render_template("dag.html", dropdowns=dropdowns, data=dag_data, log_streams=log_streams, **data)
+
+    # Dashboard plugin discovery
+    from dml_ui.plugins import discover_plugins
+    dashboard_plugins = [
+        {"id": plugin_cls.NAME.lower().replace(" ", "_"), "name": plugin_cls.NAME, "description": getattr(plugin_cls, "DESCRIPTION", "")}
+        for plugin_cls in discover_plugins()
+        if getattr(plugin_cls, "NAME", None)
+    ]
+
+    return render_template(
+        "dag.html",
+        dropdowns=dropdowns,
+        data=dag_data,
+        log_streams=log_streams,
+        dashboard_plugins=dashboard_plugins,
+        **data
+    )
+
+
+# Serve dashboard plugin content in isolation
+@app.route("/dashboard_plugin/<plugin_id>")
+def dashboard_plugin_route(plugin_id):
+    from dml_ui.plugins import discover_plugins
+    plugins = [p for p in discover_plugins() if getattr(p, "NAME", "").lower().replace(" ", "_") == plugin_id]
+    if not plugins:
+        return f"<div class='alert alert-danger'>Dashboard plugin '{plugin_id}' not found.</div>", 404
+    plugin_cls = plugins[0]
+    dml = Dml()
+    dag_id = request.args.get("dag_id")
+    repo = request.args.get("repo")
+    branch = request.args.get("branch")
+    dag_data = get_dag_info(dml, dag_id)
+    plugin_instance = plugin_cls()
+    try:
+        html = plugin_instance.render(dag_data, repo=repo, branch=branch, dag_id=dag_id)
+    except Exception as e:
+        html = f"<div class='alert alert-danger'>Error rendering dashboard: {e}</div>"
+    return f"""
+    <html><head><meta charset='utf-8'><title>{plugin_cls.NAME}</title></head>
+    <body style='margin:0;padding:0;'>
+    {html}
+    </body></html>
+    """
 
 @app.route("/node")
 def node_route():
