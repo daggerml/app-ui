@@ -35,13 +35,10 @@ def main():
     if dag_id is None:
         return render_template("index.html", dropdowns=dropdowns)
     if node_id is None:
-        print("running dag_id", dag_id)
         data = get_dag_info(dml, dag_id)
         data.pop("argv", None)
-        data.update(data.pop("result", {}))
+        # data.update(data.pop("result", {}))
         log_streams = data.pop("log_streams", {})
-        print("yyyyyyyyyyyyyyyyyyyyy")
-        print(f"AAA... {log_streams = }")
         dag_data = data.pop("dag_data")
         for node in dag_data["nodes"]:
             node["link"] = url_for(
@@ -92,12 +89,10 @@ def get_logs():
     dag_id = request.args.get("dag_id")
     stream = request.args.get("stream_name")
     next_token = request.args.get("next_token")
-    print(f"{stream = }")
     limit = request.args.get("limit", 100, type=int)
     # Get the dag info to find the log stream details
     dag_info = get_dag_info(dml, dag_id)
     log_streams = dag_info.get("log_streams", {})
-    print(f"get_logs: {log_streams = }")
     # If the stream name doesn't exist in the log_streams, return an error
     if stream not in log_streams:
         return jsonify({

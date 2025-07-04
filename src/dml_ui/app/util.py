@@ -64,41 +64,17 @@ def get_dag_info(dml, dag_id):
         node = dml.get_node_value(Ref(dag_data["argv"]))
         out["script"] = (get_sub(node[0]).data or {}).get("script")
     dag = dml.load(dag_id)
-    for key in ["result", "argv"]:
+    for key in ["result"]:
         if dag_data.get(key) is not None:
-            out[key] = get_node_repr(dag, dag_data[key])
-
-    # Extract log stream information from the DAG's .dml/env node
-    log_streams = {}
+            tmp = get_node_repr(dag, dag_data[key])
+            out[key], = [v for v in tmp.values() if v is not None]
     try:
-        # Check if .dml/env node exists in the DAG's names
-        env_node_id = None
-        for node in dag_data["nodes"]:
-            if node["name"] == ".dml/env":
-                env_node_id = node["id"]
-                break
-
-        if env_node_id:
-            env_data = dag[env_node_id].value()
-            if isinstance(env_data, dict):
-                log_group = env_data.get("log_group")
-                log_stdout = env_data.get("log_stdout")
-                log_stderr = env_data.get("log_stderr")
-
-                if log_group and log_stdout:
-                    log_streams["stdout"] = {
-                        "log_group": log_group,
-                        "log_stream": log_stdout,
-                    }
-                if log_group and log_stderr:
-                    log_streams["stderr"] = {
-                        "log_group": log_group,
-                        "log_stream": log_stderr,
-                    }
+        env_data, = [dag[node["id"]].value() for node in dag_data["nodes"] if node["name"] == ".dml/env"]
+        log_group = env_data["log_group"]
+        out["log_streams"] = {k: {"log_group": log_group, "log_stream": env_data[f"log_{k}"]} for k in ["stdout", "stderr"]}
     except Exception as e:
         logger.warning(f"Failed to extract log streams: {e}")
-
-    out["log_streams"] = log_streams
+        out["log_streams"] = {}
     return out
 
 
