@@ -18,62 +18,75 @@ def get_dropdowns(dml, repo, branch, dag_id):
         dropdowns["branches"] = {x: url_for("main", repo=repo, branch=x) for x in dml("branch", "list")}
     if branch is not None:
         tmp = {x["name"]: x["id"] for x in dml("dag", "list")}
-        dropdowns["dags"] = {k: url_for("main", repo=repo, branch=branch, dag_id=v) for k, v in tmp.items()}
+        dropdowns["dags"] = {k: url_for("dag_route", repo=repo, branch=branch, dag_id=v) for k, v in tmp.items()}
     return dropdowns
 
 
 cloudwatch_logs = CloudWatchLogs()
+
+@app.route("/dag")
+def dag_route():
+    repo = request.args.get("repo")
+    branch = request.args.get("branch")
+    dag_id = request.args.get("dag_id")
+    dml = Dml()
+    dropdowns = get_dropdowns(dml, repo, branch, dag_id)
+    data = get_dag_info(dml, dag_id)
+    data.pop("argv", None)
+    # data.update(data.pop("result", {}))
+    log_streams = data.pop("log_streams", {})
+    dag_data = data.pop("dag_data")
+    for node in dag_data["nodes"]:
+        node["link"] = url_for(
+            "node_route",
+            repo=repo,
+            branch=branch,
+            dag_id=dag_id,
+            node_id=node["id"] or "",
+        )
+        if node["node_type"] in ["import", "fn"]:
+            node["parent_link"] = url_for("dag_route", repo=repo, branch=branch, dag_id=node["parent"])
+            if node["node_type"] == "fn":
+                node["sublist"] = [
+                    [
+                        x,
+                        url_for(
+                            "node_route",
+                            repo=repo,
+                            branch=branch,
+                            dag_id=dag_id,
+                            node_id=x,
+                        ),
+                    ]
+                    for x in node["sublist"]
+                ]
+    return render_template("dag.html", dropdowns=dropdowns, data=dag_data, log_streams=log_streams, **data)
+
+@app.route("/node")
+def node_route():
+    repo = request.args.get("repo")
+    branch = request.args.get("branch")
+    dag_id = request.args.get("dag_id")
+    node_id = request.args.get("node_id")
+    dml = Dml()
+    dropdowns = get_dropdowns(dml, repo, branch, dag_id)
+    data = get_node_info(dml, dag_id, node_id)
+    return render_template(
+        "node.html",
+        dropdowns=dropdowns,
+        dag_id=dag_id,
+        dag_link=url_for("dag_route", repo=repo, branch=branch, dag_id=dag_id),
+        node_id=node_id,
+        **data,
+    )
 
 @app.route("/")
 def main():
     dml = Dml()
     repo = request.args.get("repo")
     branch = request.args.get("branch")
-    dag_id = request.args.get("dag_id")
-    node_id = request.args.get("node_id")
-    dropdowns = get_dropdowns(dml, repo, branch, dag_id)
-    if dag_id is None:
-        return render_template("index.html", dropdowns=dropdowns)
-    if node_id is None:
-        data = get_dag_info(dml, dag_id)
-        data.pop("argv", None)
-        # data.update(data.pop("result", {}))
-        log_streams = data.pop("log_streams", {})
-        dag_data = data.pop("dag_data")
-        for node in dag_data["nodes"]:
-            node["link"] = url_for(
-                "main",
-                repo=repo,
-                branch=branch,
-                dag_id=dag_id,
-                node_id=node["id"] or "",
-            )
-            if node["node_type"] in ["import", "fn"]:
-                node["parent_link"] = url_for("main", repo=repo, branch=branch, dag_id=node["parent"])
-                if node["node_type"] == "fn":
-                    node["sublist"] = [
-                        [
-                            x,
-                            url_for(
-                                "main",
-                                repo=repo,
-                                branch=branch,
-                                dag_id=dag_id,
-                                node_id=x,
-                            ),
-                        ]
-                        for x in node["sublist"]
-                    ]
-        return render_template("dag.html", dropdowns=dropdowns, data=dag_data, log_streams=log_streams, **data)
-    data = get_node_info(dml, dag_id, node_id)
-    return render_template(
-        "node.html",
-        dropdowns=dropdowns,
-        dag_id=dag_id,
-        dag_link=url_for("main", repo=repo, branch=branch, dag_id=dag_id),
-        node_id=node_id,
-        **data,
-    )
+    dropdowns = get_dropdowns(dml, repo, branch, None)
+    return render_template("index.html", dropdowns=dropdowns)
 
 @app.route("/logs", methods=["GET"])
 def get_logs():
@@ -150,7 +163,7 @@ def kill_idx():
         dml("index", "delete", idx)
     idxs = dml("index", "list")
     for idx in idxs:
-        idx["dag_link"] = url_for("main", repo=repo, branch=branch, dag_id=idx["dag"])
+        idx["dag_link"] = url_for("dag_route", repo=repo, branch=branch, dag_id=idx["dag"])
     return jsonify({"deleted": len(body), "indexes": idxs})
 
 
