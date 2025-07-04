@@ -1,48 +1,22 @@
-{% extends "layout.html" %}
-{% block title %}DAG Dashboard{% endblock %}
+{% extends "layout.html" %} {% block title %}DAG{% endblock %}
 
 {% block extra_header %}
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/base16/ashes.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
+
   <style>
-    .dashboard-header {
-      background: var(--bs-light);
-      border-radius: 0.5rem;
-      padding: 2rem 1rem 1rem 1rem;
-      margin-bottom: 2rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    }
-    .dashboard-widgets {
-      display: flex;
-      gap: 2rem;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-    }
-    .dashboard-widget {
-      background: var(--bs-white);
-      border-radius: 0.5rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-      padding: 1rem 2rem;
-      min-width: 160px;
-      flex: 1 1 160px;
-      text-align: center;
-    }
-    #cy-card {
-      min-height: 400px;
-      margin-bottom: 2rem;
+    :host {
+      display: block;
     }
     #cy {
       width: 100%;
       height: 60vh;
-      min-height: 350px;
-      background: #f8f9fa;
-      border-radius: 0.5rem;
-      border: 1px solid #dee2e6;
       position: relative;
     }
     .legend {
@@ -52,9 +26,6 @@
       padding: 15px;
       border: 1px solid var(--bs-border-color);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      background: var(--bs-white);
-      border-radius: 0.5rem;
-      z-index: 10;
     }
     .legend-item {
       display: flex;
@@ -73,179 +44,180 @@
       margin-right: 10px;
       background-color: var(--bs-primary);
     }
-    .cy-toolbar {
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.5rem;
-      margin-bottom: 0.5rem;
-    }
-    .table thead th {
-      position: sticky;
-      top: 0;
-      background: var(--bs-light);
-      z-index: 1;
-    }
-    @media (max-width: 768px) {
-      .dashboard-widgets {
-        flex-direction: column;
-        gap: 1rem;
-      }
-      #cy {
-        height: 40vh;
-      }
-    }
   </style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-header mb-4">
-  <h1 class="mb-2">DAG Dashboard</h1>
-  <p class="text-muted">Visualize and explore your Directed Acyclic Graphs, inspect nodes, and monitor execution logs.</p>
-</div>
-<div class="dashboard-widgets">
-  <div class="dashboard-widget">
-    <div class="fw-bold fs-4">{{ data.nodes|length }}</div>
-    <div class="text-muted">Nodes</div>
-  </div>
-  <div class="dashboard-widget">
-    <div class="fw-bold fs-4">{{ data.edges|length }}</div>
-    <div class="text-muted">Edges</div>
-  </div>
-  <div class="dashboard-widget">
-    <div class="fw-bold fs-5">{{ data.last_run or 'N/A' }}</div>
-    <div class="text-muted">Last Run</div>
-  </div>
-  <div class="dashboard-widget">
-    <div class="fw-bold fs-5">{{ data.status or 'N/A' }}</div>
-    <div class="text-muted">Status</div>
-  </div>
-</div>
-<div class="row g-4">
-  <div class="col-12 col-lg-7">
-    <div class="card" id="cy-card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold">DAG Visualization</span>
-        <div class="cy-toolbar">
-          <button class="btn btn-sm btn-outline-secondary" onclick="cy.fit()">Fit</button>
-          <button class="btn btn-sm btn-outline-secondary" onclick="cy.zoom(cy.zoom() + 0.2)">Zoom In</button>
-          <button class="btn btn-sm btn-outline-secondary" onclick="cy.zoom(cy.zoom() - 0.2)">Zoom Out</button>
-        </div>
-      </div>
-      <div class="card-body position-relative">
-        <div id="cy">
-          <div class="legend" id="cy-legend"></div>
+<div class="h-100">
+  <h2>Dag</h2>
+  <div class="accordion" id="accordion">
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseViz" aria-expanded="true" aria-controls="collapseViz">
+          Visualization
+        </button>
+      </h2>
+      <div id="collapseViz" class="accordion-collapse collapse show" data-bs-parent="#accordion">
+        <div class="accordion-body">
+          <div id="cy">
+            <div class="legend" id="cy-legend">
+              <h3>Shape</h3>
+              <div class="legend-item">
+                <div class="legend-shape" style="border-radius: 3px"></div>
+                <span>Internal</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-shape" style="border-radius: 50%"></div>
+                <span>Result</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-  <div class="col-12 col-lg-5">
-    <div class="card h-100">
-      <div class="card-header fw-semibold">Node Table</div>
-      <div class="card-body">
-        <input class="form-control mb-2" id="nodeTableSearch" type="text" placeholder="Search nodes...">
-        <div class="table-responsive table-hover">
-          <table class="table table-striped align-middle">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Parent</th>
-                <th>Nodetype</th>
-                <th>Datatype</th>
-                <th>Docstring</th>
-              </tr>
-            </thead>
-            <tbody id="nodeTable"></tbody>
-          </table>
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseData" aria-expanded="false" aria-controls="collapseData">
+          Node Table
+        </button>
+      </h2>
+      <div id="collapseData" class="accordion-collapse collapse" data-bs-parent="#accordion">
+        <div class="accordion-body">
+          <div class="table-responsive table-hover">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Parent</th>
+                  <th>Nodetype</th>
+                  <th>Datatype</th>
+                  <th>Docstring</th>
+                </tr>
+              </thead>
+              <tbody id="nodeTable">
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</div>
-<div class="row g-4 mt-2">
-  <div class="col-12 col-lg-6">
     {% if script %}
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">Executed Code</div>
-        <div class="card-body">
-          <pre><code class="language-python">{{ script }}</code></pre>
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCode" aria-expanded="false" aria-controls="collapseCode">
+            Executed Code
+          </button>
+        </h2>
+        <div id="collapseCode" class="accordion-collapse collapse" data-bs-parent="#accordion">
+          <div class="accordion-body">
+            <pre><code class="language-python">{{ script }}</code></pre>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+    {% if log_streams %}
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLogs" aria-expanded="false" aria-controls="collapseLogs">
+            Logs
+          </button>
+        </h2>
+        <div id="collapseLogs" class="accordion-collapse collapse" data-bs-parent="#accordion">
+          <div class="accordion-body">
+            <div class="card mb-3">
+              <div class="card-header fw-semibold">Logs</div>
+              <div class="card-body">
+                <div id="logTabs" class="mb-3">
+                  <ul class="nav nav-tabs" role="tablist">
+                    {% for stream_name in log_streams.keys() %}
+                      <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if loop.first %}active{% endif %}" id="tab-{{ stream_name }}" data-bs-toggle="tab" data-bs-target="#log-{{ stream_name }}" type="button" role="tab" aria-controls="log-{{ stream_name }}" aria-selected="{% if loop.first %}true{% else %}false{% endif %}">{{ stream_name }}</button>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                  <div class="tab-content mt-2">
+                    {% for stream_name in log_streams.keys() %}
+                      <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="log-{{ stream_name }}" role="tabpanel" aria-labelledby="tab-{{ stream_name }}">
+                        <div class="log-container" id="{{ stream_name }}-log-container">
+                          <div class="log-content" id="{{ stream_name }}-log-content">
+                            <div class="text-center">
+                              <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                              </div>
+                              Loading logs...
+                            </div>
+                          </div>
+                        </div>
+                        <div class="log-pagination mt-2">
+                          <button class="btn btn-sm btn-outline-primary load-more-logs" data-stream-name="{{ stream_name }}" data-direction="backward" disabled>
+                            ⬆️ Older logs
+                          </button>
+                          <span class="text-muted small">Page <span id="{{ stream_name }}-log-page">1</span></span>
+                          <button class="btn btn-sm btn-outline-primary load-more-logs" data-stream-name="{{ stream_name }}" data-direction="forward" disabled>
+                            ⬇️ Newer logs
+                          </button>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     {% endif %}
     {% if error %}
-      <div class="card mb-3 border-danger">
-        <div class="card-header fw-semibold text-danger">Error</div>
-        <div class="card-body">
-          <pre><code class="language-python">{{ error }}</code></pre>
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseError" aria-expanded="false" aria-controls="collapseError">
+            Error
+          </button>
+        </h2>
+        <div id="collapseError" class="accordion-collapse collapse" data-bs-parent="#accordion">
+          <div class="accordion-body">
+            <pre><code class="language-python">{{ error }}</code></pre>
+          </div>
         </div>
       </div>
     {% endif %}
     {% if result %}
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">Result</div>
-        <div class="card-body">
-          <pre><code class="language-python">{{ result }}</code></pre>
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseResult" aria-expanded="false" aria-controls="collapseResult">
+            Result
+          </button>
+        </h2>
+        <div id="collapseResult" class="accordion-collapse collapse" data-bs-parent="#accordion">
+          <div class="accordion-body">
+            <pre><code class="language-python">{{ result }}</code></pre>
+          </div>
         </div>
       </div>
     {% endif %}
     {% if html_uri %}
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">HTML Output</div>
-        <div class="card-body">
-          <iframe src="{{ html_uri }}" style="width: 100%; height: 40vh; border: none;" sandbox="allow-scripts allow-same-origin"></iframe>
-        </div>
-      </div>
-    {% endif %}
-  </div>
-  <div class="col-12 col-lg-6">
-    {% if log_streams %}
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">Logs</div>
-        <div class="card-body">
-          <div class="accordion" id="logsAccordion">
-            {% for stream_name in log_streams.keys() %}
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#{{ stream_name }}LogCollapse" aria-expanded="true" aria-controls="{{ stream_name }}LogCollapse">
-                    {{ stream_name }}
-                  </button>
-                </h2>
-                <div id="{{ stream_name }}LogCollapse" class="accordion-collapse collapse" data-bs-parent="#logsAccordion">
-                  <div class="accordion-body">
-                    <div class="d-flex justify-content-between mb-2">
-                      <button class="btn btn-sm btn-outline-primary load-more-logs" data-stream-name="{{ stream_name }}" data-direction="backward" disabled>
-                        ⬆️ Older logs
-                      </button>
-                      <button class="btn btn-sm btn-outline-secondary" id="{{ stream_name }}-auto-scroll" data-active="true">
-                        Auto-scroll
-                      </button>
-                      <button class="btn btn-sm btn-outline-primary load-more-logs" data-stream-name="{{ stream_name }}" data-direction="forward" disabled>
-                        ⬇️ Newer logs
-                      </button>
-                    </div>
-                    <div class="log-container" id="{{ stream_name }}-log-container" style="height: 300px; overflow-y: auto; background: #f8f9fa; font-family: monospace; white-space: pre-wrap; font-size: 0.85rem; padding: 10px; border: 1px solid #dee2e6;">
-                      <div class="log-content" id="{{ stream_name }}-log-content">
-                        <div class="text-center">
-                          <div class="spinner-border spinner-border-sm" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                          </div>
-                          Loading logs...
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHtml" aria-expanded="false" aria-controls="collapseHtml">
+            HTML
+          </button>
+        </h2>
+        <div id="collapseHtml" class="accordion-collapse collapse" data-bs-parent="#accordion">
+          <div class="accordion-body">
+            <iframe src="{{ html_uri }}"
+                    style="width: 100%; height: 100vh; border: none;" 
+                    sandbox="allow-scripts allow-same-origin"></iframe>
           </div>
         </div>
       </div>
     {% endif %}
   </div>
 </div>
+
 <script>
-  var graphData = {{ data|tojson|safe }};
-  console.log(graphData);
+  console.log({{ data|tojson }});
+  let graphData = {{ data|tojson }};
 
   const nodeTable = document.querySelector("#nodeTable");
   graphData.nodes
@@ -393,208 +365,77 @@
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     hljs.highlightAll();
-    initLogsHandling();
-  });
-
-  function initLogsHandling() {
-    // Get all log stream containers
-    const logCollapsibles = document.querySelectorAll('[id$="LogCollapse"]');
-    const logContainers = {};
-    const logTokens = {};
-    const isAutoScrollActive = {};
-    
-    // Initialize state for each log stream
-    logCollapsibles.forEach(collapse => {
-      const streamName = collapse.id.replace('LogCollapse', '');
-      logContainers[streamName] = document.getElementById(`${streamName}-log-content`);
-      logTokens[streamName] = {
-        nextForwardToken: null,
-        nextBackwardToken: null
-      };
-      isAutoScrollActive[streamName] = true;
-      
-      // Add event listener for collapse/expand to load logs on first open
-      collapse.addEventListener('shown.bs.collapse', function() {
-        if (!logContainers[streamName].hasAttribute('data-loaded')) {
-          fetchLogs(streamName);
-          logContainers[streamName].setAttribute('data-loaded', 'true');
-        }
-      });
-      
-      // Set up auto-scroll toggle
-      const autoScrollBtn = document.getElementById(`${streamName}-auto-scroll`);
-      if (autoScrollBtn) {
-        autoScrollBtn.addEventListener('click', function() {
-          isAutoScrollActive[streamName] = !isAutoScrollActive[streamName];
-          this.dataset.active = isAutoScrollActive[streamName];
-          if (isAutoScrollActive[streamName]) {
-            autoScrollBtn.classList.remove('btn-outline-danger');
-            autoScrollBtn.classList.add('btn-outline-secondary');
-            autoScrollBtn.textContent = 'Auto-scroll';
-            
-            // Scroll to bottom if auto-scroll is enabled
-            const container = document.getElementById(`${streamName}-log-container`);
-            if (container) {
-              container.scrollTop = container.scrollHeight;
-            }
-          } else {
-            autoScrollBtn.classList.remove('btn-outline-secondary');
-            autoScrollBtn.classList.add('btn-outline-danger');
-            autoScrollBtn.textContent = 'Auto-scroll (off)';
-          }
-        });
-      }
-      
-      // Set up scroll event to load more logs when reaching top or bottom
-      const container = document.getElementById(`${streamName}-log-container`);
-      if (container) {
-        container.addEventListener('scroll', function() {
-          // When we're near the top and have a backward token, load older logs
-          if (container.scrollTop < 100 && logTokens[streamName].nextBackwardToken) {
-            const backwardBtn = document.querySelector(`.load-more-logs[data-stream-name="${streamName}"][data-direction="backward"]`);
-            if (!backwardBtn.disabled) {
-              backwardBtn.click();
-            }
-          }
-        });
-      }
-      
-      // Set up buttons for manual loading of logs
-      document.querySelectorAll(`.load-more-logs[data-stream-name="${streamName}"]`).forEach(btn => {
-        btn.addEventListener('click', function() {
-          const direction = this.dataset.direction;
-          fetchLogs(streamName, direction === 'forward' ? logTokens[streamName].nextForwardToken : logTokens[streamName].nextBackwardToken);
-        });
-      });
+    // Logs tabbed UI initialization (dynamic, no Jinja2 control flow)
+    const logTabs = document.querySelectorAll('.nav-link[data-bs-toggle="tab"]');
+    const logState = {};
+    logTabs.forEach(tabBtn => {
+      const stream = tabBtn.id.replace('tab-', '');
+      logState[stream] = { page: 1, nextForwardToken: null, nextBackwardToken: null };
     });
-    
-    // Set up interval for fetching new logs every few seconds when auto-scroll is enabled
-    setInterval(() => {
-      Object.keys(logContainers).forEach(streamName => {
-        const collapse = document.getElementById(`${streamName}LogCollapse`);
-        // Only fetch new logs if the section is open and auto-scroll is enabled
-        if (collapse.classList.contains('show') && isAutoScrollActive[streamName] && logTokens[streamName].nextForwardToken) {
-          fetchLogs(streamName, logTokens[streamName].nextForwardToken, true);
-        }
-      });
-    }, 5000); // Update logs every 5 seconds
-    
-    function fetchLogs(streamName, nextToken = null, isBackgroundUpdate = false) {
-      const currentDagId = window.location.search.match(/[?&]dag_id=([^&]*)/)[1];
-      if (!currentDagId) return;
-      
-      // Disable buttons during fetch
-      document.querySelectorAll(`.load-more-logs[data-stream-name="${streamName}"]`).forEach(btn => {
-        btn.disabled = true;
-      });
-      
-      // Show loading indicator if not a background update
-      if (!isBackgroundUpdate) {
-        const loadingElement = document.createElement('div');
-        loadingElement.className = 'text-center my-2 loading-indicator';
-        loadingElement.innerHTML = `
-          <div class="spinner-border spinner-border-sm" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          Loading logs...
-        `;
-        
-        if (nextToken === logTokens[streamName].nextBackwardToken) {
-          // Prepend for older logs
-          logContainers[streamName].prepend(loadingElement);
-        } else if (!nextToken) {
-          // Initial load
-          logContainers[streamName].innerHTML = '';
-          logContainers[streamName].append(loadingElement);
-        } else {
-          // Append for newer logs
-          logContainers[streamName].append(loadingElement);
-        }
+    function fetchLogs(stream, direction = null) {
+      const pageSpan = document.getElementById(`${stream}-log-page`);
+      const logContent = document.getElementById(`${stream}-log-content`);
+      const container = document.getElementById(`${stream}-log-container`);
+      const backwardBtn = document.querySelector(`.load-more-logs[data-stream-name="${stream}"][data-direction="backward"]`);
+      const forwardBtn = document.querySelector(`.load-more-logs[data-stream-name="${stream}"][data-direction="forward"]`);
+      if (!logContent || !container) return;
+      // Disable buttons
+      if (backwardBtn) backwardBtn.disabled = true;
+      if (forwardBtn) forwardBtn.disabled = true;
+      logContent.innerHTML = `<div class='text-center'><div class='spinner-border spinner-border-sm' role='status'></div> Loading logs...</div>`;
+      let url = `/logs?dag_id=${encodeURIComponent(new URLSearchParams(window.location.search).get('dag_id'))}&stream_name=${encodeURIComponent(stream)}`;
+      if (direction === 'forward' && logState[stream].nextForwardToken) {
+        url += `&next_token=${encodeURIComponent(logState[stream].nextForwardToken)}`;
+        logState[stream].page++;
+      } else if (direction === 'backward' && logState[stream].nextBackwardToken) {
+        url += `&next_token=${encodeURIComponent(logState[stream].nextBackwardToken)}`;
+        logState[stream].page = Math.max(1, logState[stream].page - 1);
+      } else {
+        logState[stream].page = 1;
       }
-      
-      console.log(`Fetching logs for stream: ${streamName}, nextToken: ${nextToken}`);
-      // Build the URL with parameters
-      let url = `/logs?dag_id=${encodeURIComponent(currentDagId)}&stream_name=${encodeURIComponent(streamName)}`;
-      if (nextToken) {
-        url += `&next_token=${encodeURIComponent(nextToken)}`;
-      }
-      
-      // Fetch logs from the API
       fetch(url)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Error A.1 ${response.status}: ${response.statusText}`);
-          }
-          return response.json();
-        })
+        .then(r => r.json())
         .then(data => {
-          // Remove loading indicators
-          document.querySelectorAll('.loading-indicator').forEach(el => el.remove());
-
-          // Update tokens
-          logTokens[streamName].nextForwardToken = data.nextForwardToken;
-          logTokens[streamName].nextBackwardToken = data.nextBackwardToken;
-          
-          // Enable/disable navigation buttons
-          document.querySelector(`.load-more-logs[data-stream-name="${streamName}"][data-direction="forward"]`).disabled = !data.nextForwardToken;
-          document.querySelector(`.load-more-logs[data-stream-name="${streamName}"][data-direction="backward"]`).disabled = !data.nextBackwardToken;
-          
-          // Record scroll position and height for later adjustment
-          const container = document.getElementById(`${streamName}-log-container`);
-          const oldScrollHeight = container.scrollHeight;
-          const oldScrollTop = container.scrollTop;
-          
-          // Process and display log events
+          logState[stream].nextForwardToken = data.nextForwardToken;
+          logState[stream].nextBackwardToken = data.nextBackwardToken;
+          if (pageSpan) pageSpan.textContent = logState[stream].page;
+          if (backwardBtn) backwardBtn.disabled = !data.nextBackwardToken;
+          if (forwardBtn) forwardBtn.disabled = !data.nextForwardToken;
           if (data.events && data.events.length > 0) {
-            // Create a document fragment to hold the log entries
-            const fragment = document.createDocumentFragment();
-            
-            data.events.forEach(event => {
-              const logEntry = document.createElement('div');
-              logEntry.className = 'log-entry';
-              
-              // Format timestamp as local time
+            logContent.innerHTML = data.events.map(event => {
               const date = new Date(event.timestamp);
               const timestamp = date.toLocaleTimeString();
-              
-              // Add the log entry with timestamp
-              logEntry.textContent = `[${timestamp}] ${event.message}`;
-              fragment.appendChild(logEntry);
-            });
-            
-            // Check if this is backward pagination (older logs) or forward (newer logs)
-            if (nextToken === logTokens[streamName].nextBackwardToken) {
-              // Prepend for older logs
-              logContainers[streamName].prepend(fragment);
-              
-              // Adjust scroll position to maintain view
-              container.scrollTop = container.scrollHeight - oldScrollHeight + oldScrollTop;
-            } else {
-              // Append for newer logs
-              logContainers[streamName].append(fragment);
-              
-              // If auto-scroll is enabled, scroll to bottom
-              if (isAutoScrollActive[streamName]) {
-                container.scrollTop = container.scrollHeight;
-              }
-            }
-          } else if (!nextToken) {
-            // If no logs and this is initial load, show a message
-            logContainers[streamName].textContent = 'No logs available.';
+              return `<div class='log-entry'>[${timestamp}] ${event.message}</div>`;
+            }).join('');
+            container.scrollTop = direction === 'backward' ? 0 : container.scrollHeight;
+          } else {
+            logContent.innerHTML = '<span class="text-muted">No logs available.</span>';
           }
         })
-        .catch(error => {
-          console.error('Error fetching logs:', error);
-          document.querySelectorAll('.loading-indicator').forEach(el => {
-            el.innerHTML = `<div class="alert alert-danger">Error A.2 loading logs: ${error.message}</div>`;
-          });
-          
-          // Re-enable buttons
-          document.querySelectorAll(`.load-more-logs[data-stream-name="${streamName}"]`).forEach(btn => {
-            btn.disabled = false;
-          });
+        .catch(() => {
+          logContent.innerHTML = '<span class="text-danger">Failed to load logs.</span>';
         });
     }
-  }
+    // Fetch logs for the first (active) tab on load
+    const firstTab = document.querySelector('.nav-link.active');
+    if (firstTab) {
+      fetchLogs(firstTab.id.replace('tab-', ''));
+    }
+    // Set up tab shown event to fetch logs when a tab is activated
+    logTabs.forEach(tabBtn => {
+      tabBtn.addEventListener('shown.bs.tab', function(e) {
+        const stream = this.id.replace('tab-', '');
+        fetchLogs(stream);
+      });
+    });
+    // Set up pagination buttons
+    document.querySelectorAll('.load-more-logs').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const stream = this.getAttribute('data-stream-name');
+        const direction = this.getAttribute('data-direction');
+        fetchLogs(stream, direction);
+      });
+    });
+  });
 </script>
 {% endblock %}

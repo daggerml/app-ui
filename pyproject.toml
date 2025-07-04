@@ -31,6 +31,10 @@ Documentation = "https://github.com/Aaron Niskin/dml-ui#readme"
 Issues = "https://github.com/Aaron Niskin/dml-ui/issues"
 Source = "https://github.com/Aaron Niskin/dml-ui"
 
+# script entry points
+[project.scripts]
+dml-ui-dev = "dml_ui.app.impl:run"
+
 [tool.hatch.version]
 path = "src/dml_ui/__about__.py"
 

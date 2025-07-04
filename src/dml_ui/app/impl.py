@@ -4,8 +4,8 @@ from argparse import ArgumentParser
 from daggerml import Dml
 from flask import Flask, jsonify, render_template, request, url_for
 
-from dml_util.app.util import get_dag_info, get_node_info
-from dml_util.aws.cloudwatch import CloudWatchLogs
+from dml_ui.app.util import get_dag_info, get_node_info
+from dml_ui.cloudwatch import CloudWatchLogs
 
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
@@ -142,9 +142,10 @@ def kill_idx():
 def run():
     parser = ArgumentParser()
     parser.add_argument("-p", "--port", type=int, default=5000)
+    parser.add_argument("--debug", action="store_true", help="Run in debug mode")
     args = parser.parse_args()
     logger.setLevel(logging.DEBUG)
-    app.run(debug=True, port=args.port)
+    app.run(debug=args.debug, port=args.port)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
