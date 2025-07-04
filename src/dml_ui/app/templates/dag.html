@@ -55,6 +55,23 @@
     .code-container .card-body {
       background-color: var(--bs-gray-100);
     }
+    #plugin-container {
+      position: relative;
+      overflow: hidden;
+    }
+    #plugin-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      min-height: 60vh;
+    }
+    .plugin-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+    }
   </style>
 {% endblock %}
 
@@ -93,6 +110,9 @@
       <button class="nav-link" id="html-tab" data-bs-toggle="tab" data-bs-target="#html" type="button" role="tab" aria-controls="html" aria-selected="false">HTML</button>
     </li>
     {% endif %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="false">Dashboard</button>
+    </li>
   </ul>
   <div class="tab-content mt-3" id="dagTabContent">
     <div class="tab-pane fade show active" id="viz" role="tabpanel" aria-labelledby="viz-tab">
@@ -211,6 +231,35 @@
               sandbox="allow-scripts allow-same-origin"></iframe>
     </div>
     {% endif %}
+    <div class="tab-pane fade" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+      <div class="container-fluid">
+        <div class="card">
+          <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0">Dashboard</h5>
+              <div class="dropdown">
+                <button class="btn btn-outline-primary dropdown-toggle" type="button" id="plugin-selector" data-bs-toggle="dropdown" aria-expanded="false">
+                  Select Plugin
+                </button>
+                <ul class="dropdown-menu" id="plugin-dropdown" aria-labelledby="plugin-selector">
+                  <li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div id="plugin-container" style="width: 100%; min-height: 60vh; border: none; background-color: #f8f9fa;">
+              <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                <div class="text-center">
+                  <i class="bi bi-plugin fs-1 mb-3"></i>
+                  <p>Select a plugin from the dropdown above to display its content</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -449,6 +498,116 @@
         fetchLogs(stream, direction);
       });
     });
+  });
+</script>
+<script>
+  // Dashboard plugin functionality
+  document.addEventListener('DOMContentLoaded', function() {
+    const pluginDropdown = document.getElementById('plugin-dropdown');
+    const pluginSelector = document.getElementById('plugin-selector');
+    const pluginContainer = document.getElementById('plugin-container');
+    
+    // Load available plugins when dashboard tab is first clicked
+    document.getElementById('dashboard-tab').addEventListener('click', function() {
+      if (!this.dataset.pluginsLoaded) {
+        loadPlugins();
+        this.dataset.pluginsLoaded = 'true';
+      }
+    });
+    
+    function loadPlugins() {
+      pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>';
+      
+      // Fetch available plugins from backend
+      fetch('/api/plugins')
+        .then(response => response.json())
+        .then(plugins => {
+          if (plugins && plugins.length > 0) {
+            pluginDropdown.innerHTML = plugins.map(plugin => 
+              `<li><a class="dropdown-item" href="#" data-plugin-id="${plugin.id}">${plugin.name}</a></li>`
+            ).join('');
+            
+            // Add click event listeners to plugin options
+            pluginDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+              item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const pluginId = this.dataset.pluginId;
+                const pluginName = this.textContent;
+                loadPlugin(pluginId, pluginName);
+              });
+            });
+          } else {
+            pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">No plugins available</span></li>';
+          }
+        })
+        .catch(error => {
+          console.error('Error loading plugins:', error);
+          pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-danger">Error loading plugins</span></li>';
+        });
+    }
+    
+    function loadPlugin(pluginId, pluginName) {
+      // Update dropdown button text
+      pluginSelector.innerHTML = pluginName + ' <span class="caret"></span>';
+      
+      // Show loading state
+      showPluginLoading();
+      
+      // Get current DAG ID from URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const dagId = urlParams.get('dag_id');
+      
+      // Fetch plugin content
+      const pluginUrl = `/api/plugins/${encodeURIComponent(pluginId)}?dag_id=${encodeURIComponent(dagId)}`;
+      
+      fetch(pluginUrl)
+        .then(response => response.text())
+        .then(html => {
+          // Create isolated iframe for plugin content
+          const iframe = document.createElement('iframe');
+          iframe.style.width = '100%';
+          iframe.style.height = '60vh';
+          iframe.style.border = 'none';
+          iframe.sandbox = 'allow-scripts allow-same-origin allow-forms';
+          
+          // Clear container and add iframe
+          pluginContainer.innerHTML = '';
+          pluginContainer.appendChild(iframe);
+          
+          // Write plugin content to iframe
+          iframe.contentDocument.open();
+          iframe.contentDocument.write(html);
+          iframe.contentDocument.close();
+        })
+        .catch(error => {
+          console.error('Error loading plugin:', error);
+          showPluginError('Failed to load plugin content');
+        });
+    }
+    
+    function showPluginLoading() {
+      pluginContainer.innerHTML = `
+        <div class="d-flex align-items-center justify-content-center h-100">
+          <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted">Loading plugin...</p>
+          </div>
+        </div>
+      `;
+    }
+    
+    function showPluginError(message) {
+      pluginContainer.innerHTML = `
+        <div class="d-flex align-items-center justify-content-center h-100">
+          <div class="text-center">
+            <i class="bi bi-exclamation-triangle text-danger fs-1 mb-3"></i>
+            <p class="text-danger">${message}</p>
+          </div>
+        </div>
+      `;
+    }
   });
 </script>
 {% endblock %}
