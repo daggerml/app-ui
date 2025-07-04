@@ -2,6 +2,14 @@ import base64
 import importlib.metadata
 import io
 
+# Configure matplotlib backend before any imports to prevent GUI issues
+try:
+    import matplotlib
+    matplotlib.use('Agg')  # Use Anti-Grain Geometry backend (no GUI)
+except ImportError:
+    # matplotlib not available, plugins will handle this gracefully
+    pass
+
 class DashboardPlugin:
     NAME = None
     DESCRIPTION = None
@@ -31,8 +39,8 @@ def discover_plugins():
     plugins = []
     seen_names = set()
     
-    # First, add built-in plugins
-    built_in_plugins = [DAGInfoPlugin, SimpleStatsPlugin, MatplotlibStatsPlugin, DMLExplorerPlugin]
+    # First, add built-in plugins (excluding matplotlib for now due to threading issues)
+    built_in_plugins = [DAGInfoPlugin, SimpleStatsPlugin, DMLExplorerPlugin]  # Temporarily removed MatplotlibStatsPlugin
     
     for plugin_cls in built_in_plugins:
         try:
@@ -138,6 +146,8 @@ class MatplotlibStatsPlugin(DashboardPlugin):
             fig.savefig(buf, format="png", dpi=150, bbox_inches='tight')
             buf.seek(0)
             img_b64 = base64.b64encode(buf.read()).decode("utf-8")
+            
+            # Clean up the figure to free memory
             plt.close(fig)
             
             return f"""
@@ -154,6 +164,13 @@ class MatplotlibStatsPlugin(DashboardPlugin):
             <div class="alert alert-warning">
                 <h4>Matplotlib not available</h4>
                 <p>Install matplotlib to view charts: <code>pip install matplotlib</code></p>
+            </div>
+            """
+        except Exception as e:
+            return f"""
+            <div class="alert alert-danger">
+                <h4>Chart Error</h4>
+                <p>Failed to generate chart: {str(e)}</p>
             </div>
             """
 

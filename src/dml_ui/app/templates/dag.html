@@ -444,7 +444,16 @@
       if (backwardBtn) backwardBtn.disabled = true;
       if (forwardBtn) forwardBtn.disabled = true;
       logContent.innerHTML = `<div class='text-center'><div class='spinner-border spinner-border-sm' role='status'></div> Loading logs...</div>`;
-      let url = `/logs?dag_id=${encodeURIComponent(new URLSearchParams(window.location.search).get('dag_id'))}&stream_name=${encodeURIComponent(stream)}`;
+      const urlParams = new URLSearchParams(window.location.search);
+      let url = `/logs?dag_id=${encodeURIComponent(urlParams.get('dag_id'))}&stream_name=${encodeURIComponent(stream)}`;
+      const repo = urlParams.get('repo');
+      const branch = urlParams.get('branch');
+      if (repo) {
+        url += `&repo=${encodeURIComponent(repo)}`;
+      }
+      if (branch) {
+        url += `&branch=${encodeURIComponent(branch)}`;
+      }
       if (direction === 'forward' && logState[stream].nextForwardToken) {
         url += `&next_token=${encodeURIComponent(logState[stream].nextForwardToken)}`;
         logState[stream].page++;
