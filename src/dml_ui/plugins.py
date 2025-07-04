@@ -25,6 +25,9 @@ class DashboardPlugin:
 
 def discover_plugins():
     """Discover all available dashboard plugins"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     plugins = []
     seen_names = set()
     
@@ -32,22 +35,32 @@ def discover_plugins():
     built_in_plugins = [DAGInfoPlugin, SimpleStatsPlugin, MatplotlibStatsPlugin, DMLExplorerPlugin]
     
     for plugin_cls in built_in_plugins:
-        if plugin_cls.NAME and plugin_cls.NAME not in seen_names:
-            plugins.append(plugin_cls)
-            seen_names.add(plugin_cls.NAME)
+        try:
+            if plugin_cls.NAME and plugin_cls.NAME not in seen_names:
+                # Test plugin instantiation to catch early errors
+                test_instance = plugin_cls()
+                plugins.append(plugin_cls)
+                seen_names.add(plugin_cls.NAME)
+        except Exception as e:
+            logger.warning(f"Failed to load built-in plugin {plugin_cls.__name__}: {e}")
     
     # Then discover plugins from entry points
     try:
         for entry_point in importlib.metadata.entry_points(group="dml_ui.dashboard_plugins"):
-            plugin_cls = entry_point.load()
-            if (issubclass(plugin_cls, DashboardPlugin) and 
-                plugin_cls.NAME and 
-                plugin_cls.NAME not in seen_names):
-                plugins.append(plugin_cls)
-                seen_names.add(plugin_cls.NAME)
-    except Exception:
+            try:
+                plugin_cls = entry_point.load()
+                if (issubclass(plugin_cls, DashboardPlugin) and 
+                    plugin_cls.NAME and 
+                    plugin_cls.NAME not in seen_names):
+                    # Test plugin instantiation to catch early errors
+                    test_instance = plugin_cls()
+                    plugins.append(plugin_cls)
+                    seen_names.add(plugin_cls.NAME)
+            except Exception as e:
+                logger.warning(f"Failed to load plugin from entry point {entry_point.name}: {e}")
+    except Exception as e:
         # Entry points might not be available in development
-        pass
+        logger.debug(f"Entry points not available: {e}")
     
     return plugins
 
@@ -232,38 +245,56 @@ class DMLExplorerPlugin(DashboardPlugin):
     DESCRIPTION = "Interactive explorer with direct DML API access"
 
     def render(self, dml, dag, **kwargs):
-        dag_id = kwargs.get('dag_id', 'Unknown')
-        
-        # Demonstrate direct DML API access
         try:
-            # Get repository information
-            repos = dml("repo", "list")
-            repo_count = len(repos) if repos else 0
+            dag_id = kwargs.get('dag_id', 'Unknown')
+            
+            # Initialize default values
+            repo_count = 0
+            branches = []
+            dag_count = 0
+            error_messages = []
+            
+            # Safely access DML API with individual try-catch blocks
+            try:
+                repos = dml("repo", "list")
+                repo_count = len(repos) if repos else 0
+            except Exception as e:
+                error_messages.append(f"Failed to get repositories: {str(e)}")
+                repo_count = 0
             
             # Get branch information if repo is available
             repo_name = kwargs.get('repo')
-            branches = []
             if repo_name:
                 try:
                     branches = dml("branch", "list", repo_name)
-                except Exception:
+                    if not isinstance(branches, list):
+                        branches = []
+                except Exception as e:
+                    error_messages.append(f"Failed to get branches: {str(e)}")
                     branches = []
             
-            # Get DAG list
+            # Get DAG list safely
             try:
                 dags = dml("dag", "list")
                 dag_count = len(dags) if dags else 0
-            except Exception:
+            except Exception as e:
+                error_messages.append(f"Failed to get DAG list: {str(e)}")
                 dag_count = 0
             
-            # Extract detailed node information
-            nodes = dag.get("nodes", [])
-            edges = dag.get("edges", [])
+            # Extract detailed node information safely
+            nodes = dag.get("nodes", []) if isinstance(dag, dict) else []
+            edges = dag.get("edges", []) if isinstance(dag, dict) else []
             
             # Find function nodes with additional details
-            function_nodes = [node for node in nodes if node.get("node_type") == "fn"]
+            function_nodes = []
+            try:
+                function_nodes = [node for node in nodes if isinstance(node, dict) and node.get("node_type") == "fn"]
+            except Exception as e:
+                error_messages.append(f"Failed to process function nodes: {str(e)}")
+                function_nodes = []
             
-            html = f"""
+            # Build the HTML response
+            html = """
             <div class="container-fluid">
                 <div class="row mb-4">
                     <div class="col-12">
@@ -273,7 +304,27 @@ class DMLExplorerPlugin(DashboardPlugin):
                         </div>
                     </div>
                 </div>
-                
+            """
+            
+            # Show error messages if any
+            if error_messages:
+                html += """
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            <h6>API Warnings:</h6>
+                            <ul class="mb-0">
+                """
+                for msg in error_messages:
+                    html += f"<li>{msg}</li>"
+                html += """
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                """
+            
+            html += f"""
                 <div class="row mb-4">
                     <div class="col-md-3">
                         <div class="card text-center">
@@ -333,15 +384,24 @@ class DMLExplorerPlugin(DashboardPlugin):
             
             if function_nodes:
                 for func_node in function_nodes[:10]:  # Show first 10
-                    name = func_node.get('name', 'Unnamed')
-                    node_id = func_node.get('id', 'Unknown')[:8]
-                    doc = func_node.get('doc', 'No documentation')[:100]
-                    html += f"""
-                    <div class="mb-2 p-2 border-start border-primary border-3">
-                        <strong>{name}</strong> <small class="text-muted">({node_id})</small><br>
-                        <small>{doc}{'...' if len(func_node.get('doc', '')) > 100 else ''}</small>
-                    </div>
-                    """
+                    try:
+                        name = func_node.get('name', 'Unnamed')
+                        node_id = str(func_node.get('id', 'Unknown'))[:8]
+                        doc = func_node.get('doc', 'No documentation')
+                        if len(doc) > 100:
+                            doc = doc[:100] + '...'
+                        html += f"""
+                        <div class="mb-2 p-2 border-start border-primary border-3">
+                            <strong>{name}</strong> <small class="text-muted">({node_id})</small><br>
+                            <small>{doc}</small>
+                        </div>
+                        """
+                    except Exception as e:
+                        html += f"""
+                        <div class="mb-2 p-2 border-start border-danger border-3">
+                            <small class="text-danger">Error processing function node: {str(e)}</small>
+                        </div>
+                        """
                 if len(function_nodes) > 10:
                     html += f"<p class='text-muted'>... and {len(function_nodes) - 10} more functions</p>"
             else:
@@ -364,9 +424,12 @@ class DMLExplorerPlugin(DashboardPlugin):
             """
             
             # Show first 10 nodes in a readable format
-            import json
-            sample_nodes = nodes[:10] if nodes else []
-            html += json.dumps(sample_nodes, indent=2, default=str)
+            try:
+                import json
+                sample_nodes = nodes[:10] if nodes else []
+                html += json.dumps(sample_nodes, indent=2, default=str)
+            except Exception as e:
+                html += f"Error formatting DAG data: {str(e)}"
             
             html += """
                                 </pre>
@@ -378,11 +441,13 @@ class DMLExplorerPlugin(DashboardPlugin):
             """
             
         except Exception as e:
+            # Catch-all exception handler for any unexpected errors
             html = f"""
             <div class="container-fluid">
                 <div class="alert alert-danger">
-                    <h4>Error accessing DML API</h4>
-                    <p>Failed to fetch data from DML: {str(e)}</p>
+                    <h4><i class="bi bi-exclamation-triangle"></i> Plugin Error</h4>
+                    <p>An unexpected error occurred in the DML Explorer plugin:</p>
+                    <pre class="mt-2">{str(e)}</pre>
                 </div>
             </div>
             """

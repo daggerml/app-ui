@@ -553,13 +553,22 @@
       // Show loading state
       showPluginLoading();
       
-      // Get current DAG ID from URL parameters
+      // Get current parameters from URL
       const urlParams = new URLSearchParams(window.location.search);
       const dagId = urlParams.get('dag_id');
+      const repo = urlParams.get('repo');
+      const branch = urlParams.get('branch');
+      
+      // Build plugin URL with all necessary parameters
+      let pluginUrl = `/api/plugins/${encodeURIComponent(pluginId)}?dag_id=${encodeURIComponent(dagId)}`;
+      if (repo) {
+        pluginUrl += `&repo=${encodeURIComponent(repo)}`;
+      }
+      if (branch) {
+        pluginUrl += `&branch=${encodeURIComponent(branch)}`;
+      }
       
       // Fetch plugin content
-      const pluginUrl = `/api/plugins/${encodeURIComponent(pluginId)}?dag_id=${encodeURIComponent(dagId)}`;
-      
       fetch(pluginUrl)
         .then(response => response.text())
         .then(html => {

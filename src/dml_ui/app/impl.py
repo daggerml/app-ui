@@ -31,7 +31,7 @@ def dag_route():
     repo = request.args.get("repo")
     branch = request.args.get("branch")
     dag_id = request.args.get("dag_id")
-    dml = Dml()
+    dml = Dml(repo=repo, branch=branch)
     dropdowns = get_dropdowns(dml, repo, branch, dag_id)
     data = get_dag_info(dml, dag_id)
     data.pop("argv", None)
@@ -70,7 +70,7 @@ def node_route():
     branch = request.args.get("branch")
     dag_id = request.args.get("dag_id")
     node_id = request.args.get("node_id")
-    dml = Dml()
+    dml = Dml(repo=repo, branch=branch)
     dropdowns = get_dropdowns(dml, repo, branch, dag_id)
     data = get_node_info(dml, dag_id, node_id)
     return render_template(
@@ -84,9 +84,9 @@ def node_route():
 
 @app.route("/")
 def main():
-    dml = Dml()
     repo = request.args.get("repo")
     branch = request.args.get("branch")
+    dml = Dml(repo=repo, branch=branch)
     dropdowns = get_dropdowns(dml, repo, branch, None)
     return render_template("index.html", dropdowns=dropdowns)
 
@@ -100,7 +100,7 @@ def get_logs():
     - next_token: Token for pagination
     - limit: Maximum number of log events to return
     """
-    dml = Dml()
+    dml = Dml(repo=request.args.get("repo"), branch=request.args.get("branch"))
     dag_id = request.args.get("dag_id")
     stream = request.args.get("stream_name")
     next_token = request.args.get("next_token")
@@ -196,7 +196,9 @@ def api_plugin_content(plugin_id):
         if not dag_id:
             return "<div style='text-align: center; padding: 50px;'><h3>No DAG ID provided</h3></div>", 400
         
-        dml = Dml()
+        repo = request.args.get("repo")
+        branch = request.args.get("branch")
+        dml = Dml(repo=repo, branch=branch)
         
         # Use the same DAG retrieval logic as get_dag_info
         # First get the DAG description for structure/metadata
@@ -206,14 +208,34 @@ def api_plugin_content(plugin_id):
         
         # Initialize and render the plugin with dml instance and loaded dag
         plugin_instance = plugin_cls()
-        rendered_content = plugin_instance.render(
-            dml, 
-            dag_data,  # Pass the described DAG structure (like in get_dag_info)
-            dag_id=dag_id,
-            repo=request.args.get("repo"),
-            branch=request.args.get("branch"),
-            dag_object=dag  # Also pass the loaded DAG object for value access if needed
-        )
+        try:
+            rendered_content = plugin_instance.render(
+                dml, 
+                dag_data,  # Pass the described DAG structure (like in get_dag_info)
+                dag_id=dag_id,
+                repo=repo,
+                branch=branch,
+                dag_object=dag  # Also pass the loaded DAG object for value access if needed
+            )
+        except Exception as plugin_error:
+            logger.error(f"Plugin {plugin_id} failed to render: {plugin_error}")
+            rendered_content = f"""
+            <div class="alert alert-danger">
+                <h4><i class="bi bi-exclamation-triangle"></i> Plugin Error</h4>
+                <p><strong>Plugin:</strong> {plugin_cls.NAME}</p>
+                <p><strong>Error:</strong> {str(plugin_error)}</p>
+                <details class="mt-3">
+                    <summary>Technical Details</summary>
+                    <pre class="mt-2 p-2 bg-light"><code>{repr(plugin_error)}</code></pre>
+                </details>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        This plugin may not be compatible with the current DAG structure or data format.
+                        Check the plugin implementation or try a different plugin.
+                    </small>
+                </div>
+            </div>
+            """
         
         # Wrap content in a complete HTML document for iframe
         html_content = f"""
@@ -248,7 +270,7 @@ def api_plugin_content(plugin_id):
         return html_content, 200, {'Content-Type': 'text/html'}
         
     except Exception as e:
-        logger.error(f"Error rendering plugin {plugin_id}: {e}")
+        logger.error(f"Error rendering plugin {plugin_id}: {e}", exc_info=True)
         error_html = f"""
         <!DOCTYPE html>
         <html lang="en">
@@ -257,12 +279,24 @@ def api_plugin_content(plugin_id):
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Plugin Error</title>
             <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
         </head>
         <body>
             <div class="container mt-5">
                 <div class="alert alert-danger">
-                    <h4>Plugin Error</h4>
-                    <p>Failed to render plugin '{plugin_id}': {str(e)}</p>
+                    <h4><i class="bi bi-exclamation-triangle"></i> Plugin System Error</h4>
+                    <p><strong>Plugin ID:</strong> {plugin_id}</p>
+                    <p><strong>Error:</strong> {str(e)}</p>
+                    <details class="mt-3">
+                        <summary>Technical Details</summary>
+                        <pre class="mt-2 p-2 bg-light"><code>{repr(e)}</code></pre>
+                    </details>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            This error occurred in the plugin system infrastructure. 
+                            Please check the server logs for more details.
+                        </small>
+                    </div>
                 </div>
             </div>
         </body>
@@ -281,9 +315,9 @@ def plugins(plugin_name):
     if len(plugins) > 1:
         return jsonify({"error": f"Multiple plugins found with name {plugin_name}"}), 500
     plugin = plugins[0]
-    dml = Dml()
     repo = request.args.get("repo")
     branch = request.args.get("branch")
+    dml = Dml(repo=repo, branch=branch)
     dag_id = request.args.get("dag_id")
     
     # Get raw DAG object instead of processed dag_data
@@ -295,17 +329,17 @@ def plugins(plugin_name):
 
 @app.route("/idx")
 def idx():
-    dml = Dml()
     repo = request.args.get("repo")
     branch = request.args.get("branch")
+    dml = Dml(repo=repo, branch=branch)
     dropdowns = get_dropdowns(dml, repo, branch, None)
     return render_template("indexes.html", dropdowns=dropdowns)
 
 @app.route("/kill-indexes", methods=["POST"])
 def kill_idx():
-    dml = Dml()
     repo = request.args.get("repo")
     branch = request.args.get("branch")
+    dml = Dml(repo=repo, branch=branch)
     body = request.form.getlist("del-idx", type=str)
     for idx in body:
         dml("index", "delete", idx)
