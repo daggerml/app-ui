@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dml-ui"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Aaron Niskin", email = "aaron@niskin.org" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = []
+
+[project.urls]
+Documentation = "https://github.com/Aaron Niskin/dml-ui#readme"
+Issues = "https://github.com/Aaron Niskin/dml-ui/issues"
+Source = "https://github.com/Aaron Niskin/dml-ui"
+
+[tool.hatch.version]
+path = "src/dml_ui/__about__.py"
+
+[tool.hatch.envs.default]
+extra-dependencies = [
+  "mypy>=1.0.0",
+  # github dependencies on branch: "main" with features: dml,nb,app,test
+  "dml-util[dml,nb,app,test] @ git+https://github.com/daggerml/dml-util.git@simplify-tests",
+]
+[tool.hatch.envs.default.scripts]
+check = "mypy --install-types --non-interactive {args:src/dml_ui tests}"
+
+[tool.coverage.run]
+source_pkgs = ["dml_ui", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/dml_ui/__about__.py",
+]
+
+[tool.coverage.paths]
+dml_ui = ["src/dml_ui", "*/dml-ui/src/dml_ui"]
+tests = ["tests", "*/dml-ui/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
