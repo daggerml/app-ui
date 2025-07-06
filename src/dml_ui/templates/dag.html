@@ -20,13 +20,53 @@
       position: relative;
     }
     
-    /* Inline DAG Statistics */
+    /* Inline DAG Statistics - positioned on right */
     .dag-stats-inline {
       display: flex;
       align-items: center;
       gap: 1rem;
-      flex: 1;
-      margin: 0 1rem;
+    }
+    
+    /* DAG Stats Container - with background and border */
+    .dag-stats-container {
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--bs-border-color-translucent);
+      border-radius: 0.5rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      backdrop-filter: blur(20px);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.5rem 0.75rem;
+    }
+    
+    .dag-stats-container:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      border-color: var(--bs-primary-border-subtle);
+    }
+    
+    /* DAG Stats Header with icon */
+    .dag-stats-header {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--bs-gray-700);
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      white-space: nowrap;
+      margin: 0;
+    }
+    
+    /* Filter nodes styling - positioned after DAG title */
+    .filter-nodes-container {
+      opacity: 0.8;
+      transition: opacity 0.2s ease-in-out;
+      white-space: nowrap;
+    }
+    
+    .filter-nodes-container:hover {
+      opacity: 1;
     }
     .legend {
       position: absolute;
@@ -193,6 +233,11 @@
     }
     
     /* Dark mode support */
+    [data-bs-theme="dark"] .dag-stats-container {
+      background: rgba(33, 37, 41, 0.98);
+      border-color: var(--bs-border-color);
+    }
+    
     [data-bs-theme="dark"] .dag-stat-item {
       background: var(--bs-gray-800);
       border-color: var(--bs-border-color);
@@ -240,87 +285,94 @@
 
 {% block content %}
 <div class="h-100">
-  <!-- Header Row with DAG Title, Stats, and Filter -->
+  <!-- Header Row with DAG Title, Toggle, and Stats -->
   <div class="d-flex align-items-center mb-3 gap-3">
     <h2 class="mb-0">DAG</h2>
     
-    <!-- DAG Statistics Inline -->
-    <div class="dag-stats-inline">
-      <div class="dag-stats-grid">
-        <div class="dag-stat-item">
-          <div class="dag-stat-value">{{ data.nodes|length }}</div>
-          <div class="dag-stat-label">Nodes</div>
-        </div>
-        
-        <div class="dag-stat-item">
-          <div class="dag-stat-value">{{ data.edges|length }}</div>
-          <div class="dag-stat-label">Edges</div>
-        </div>
-        
-        {% set node_types = {} %}
-        {% for node in data.nodes %}
-          {% set _ = node_types.update({node.node_type: node_types.get(node.node_type, 0) + 1}) %}
-        {% endfor %}
-        
-        <div class="dag-stat-item clickable" 
-             data-bs-toggle="tooltip" 
-             data-bs-placement="bottom"
-             data-bs-html="true"
-             title="Node Types:<br>{% for type, count in node_types.items() %}<strong>{{ type }}:</strong> {{ count }}<br>{% endfor %}">
-          <div class="dag-stat-value">{{ node_types|length }}</div>
-          <div class="dag-stat-label">Types</div>
-        </div>
-        
-        <!-- Calculate execution stats if available -->
-        {% set executed_nodes = data.nodes | selectattr('executed', 'defined') | list %}
-        {% if executed_nodes %}
-        <div class="dag-stat-item">
-          <div class="dag-stat-value">{{ executed_nodes | length }}</div>
-          <div class="dag-stat-label">Executed</div>
-        </div>
-        {% endif %}
-        
-        <!-- Calculate depth (longest path) -->
-        {% set max_depth = 0 %}
-        {% for node in data.nodes %}
-          {% if node.get('depth', 0) > max_depth %}
-            {% set max_depth = node.depth %}
-          {% endif %}
-        {% endfor %}
-        {% if max_depth > 0 %}
-        <div class="dag-stat-item">
-          <div class="dag-stat-value">{{ max_depth }}</div>
-          <div class="dag-stat-label">Depth</div>
-        </div>
-        {% endif %}
-      </div>
-      
-      <!-- Metadata Section -->
-      {% if data.name or data.id %}
-      <div class="dag-stat-meta">
-        {% if data.name %}
-        <div class="dag-meta-item">
-          <div class="dag-meta-label">Name</div>
-          <div class="dag-meta-value" title="{{ data.name }}">{{ data.name }}</div>
-        </div>
-        {% endif %}
-        
-        {% if data.id %}
-        <div class="dag-meta-item">
-          <div class="dag-meta-label">ID</div>
-          <div class="dag-meta-value" title="{{ data.id }}">{{ data.id[:12] }}{% if data.id|length > 12 %}...{% endif %}</div>
-        </div>
-        {% endif %}
-      </div>
-      {% endif %}
-    </div>
-    
-    <!-- Filter Nodes Checkbox - moved to end -->
-    <div class="form-check form-switch filter-nodes-container ms-auto">
+    <!-- Filter Nodes Checkbox - positioned after DAG title -->
+    <div class="form-check form-switch filter-nodes-container">
       <input class="form-check-input" type="checkbox" id="filterNodesSwitch" checked style="transform: scale(0.9);">
       <label class="form-check-label text-muted small" for="filterNodesSwitch" style="font-size: 0.85rem;">
         Filter nodes
       </label>
+    </div>
+    
+    <!-- DAG Statistics - moved to right side -->
+    <div class="dag-stats-inline ms-auto">
+      <div class="dag-stats-container">
+        <div class="dag-stats-header">
+          <i class="bi bi-bar-chart-line"></i>
+          DAG Statistics
+        </div>
+        
+        <div class="dag-stats-grid">
+          <div class="dag-stat-item">
+            <div class="dag-stat-value">{{ data.nodes|length }}</div>
+            <div class="dag-stat-label">Nodes</div>
+          </div>
+          
+          <div class="dag-stat-item">
+            <div class="dag-stat-value">{{ data.edges|length }}</div>
+            <div class="dag-stat-label">Edges</div>
+          </div>
+          
+          {% set node_types = {} %}
+          {% for node in data.nodes %}
+            {% set _ = node_types.update({node.node_type: node_types.get(node.node_type, 0) + 1}) %}
+          {% endfor %}
+          
+          <div class="dag-stat-item clickable" 
+               data-bs-toggle="tooltip" 
+               data-bs-placement="bottom"
+               data-bs-html="true"
+               title="Node Types:<br>{% for type, count in node_types.items() %}<strong>{{ type }}:</strong> {{ count }}<br>{% endfor %}">
+            <div class="dag-stat-value">{{ node_types|length }}</div>
+            <div class="dag-stat-label">Types</div>
+          </div>
+          
+          <!-- Calculate execution stats if available -->
+          {% set executed_nodes = data.nodes | selectattr('executed', 'defined') | list %}
+          {% if executed_nodes %}
+          <div class="dag-stat-item">
+            <div class="dag-stat-value">{{ executed_nodes | length }}</div>
+            <div class="dag-stat-label">Executed</div>
+          </div>
+          {% endif %}
+          
+          <!-- Calculate depth (longest path) -->
+          {% set max_depth = 0 %}
+          {% for node in data.nodes %}
+            {% if node.get('depth', 0) > max_depth %}
+              {% set max_depth = node.depth %}
+            {% endif %}
+          {% endfor %}
+          {% if max_depth > 0 %}
+          <div class="dag-stat-item">
+            <div class="dag-stat-value">{{ max_depth }}</div>
+            <div class="dag-stat-label">Depth</div>
+          </div>
+          {% endif %}
+        </div>
+        
+        <!-- Metadata Section -->
+        {% if data.name or data.id %}
+        <div class="dag-stat-meta">
+          {% if data.name %}
+          <div class="dag-meta-item">
+            <div class="dag-meta-label">Name</div>
+            <div class="dag-meta-value" title="{{ data.name }}">{{ data.name }}</div>
+          </div>
+          {% endif %}
+          
+          {% if data.id %}
+          <div class="dag-meta-item">
+            <div class="dag-meta-label">ID</div>
+            <div class="dag-meta-value" title="{{ data.id }}">{{ data.id[:12] }}{% if data.id|length > 12 %}...{% endif %}</div>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
     </div>
   </div>
   <ul class="nav nav-tabs" id="dagTab" role="tablist">
