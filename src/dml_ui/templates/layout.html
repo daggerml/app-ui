@@ -436,9 +436,6 @@
                     {% elif section['type'] == 'dags' %}
                       <i class="bi bi-diagram-3"></i>
                       <div class="sidebar-empty-text">No DAGs found</div>
-                    {% elif section['type'] == 'nodes' %}
-                      <i class="bi bi-nodes"></i>
-                      <div class="sidebar-empty-text">No nodes found</div>
                     {% else %}
                       <i class="bi bi-inbox"></i>
                       <div class="sidebar-empty-text">No items found</div>
@@ -482,7 +479,7 @@
       
       // Restore section states from localStorage
       document.addEventListener('DOMContentLoaded', function() {
-        const sections = ['repos', 'branches', 'dags', 'nodes'];
+        const sections = ['repos', 'branches', 'dags'];
         sections.forEach(sectionType => {
           const stored = localStorage.getItem(`sidebar-section-${sectionType}`);
           const toggle = document.getElementById(`toggle-${sectionType}`);

@@ -137,23 +137,6 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
             })
         sidebar["sections"].append(dag_section)
     
-    # Show nodes section if DAG is selected
-    if repo and branch and dag_id and dag_data:
-        node_section = {"title": "Nodes", "type": "nodes", "items": [], "collapsed": False}
-        nodes = dag_data.get("nodes", [])
-        for node in nodes:
-            node_name = node.get("name", f"#{node['id'][:8]}")
-            node_section['items'].append({
-                'name': node_name,
-                'display_name': node_name,
-                'url': url_for('node_route', repo=repo, branch=branch, dag_id=dag_id, node_id=node["id"]),
-                'icon': f'bi-{get_node_icon(node.get("node_type", "unknown"))}',
-                'type': 'node',
-                'node_type': node.get("node_type", "unknown"),
-                'node_id': node["id"]
-            })
-        sidebar["sections"].append(node_section)
-    
     return sidebar
 
 def get_node_icon(node_type):
