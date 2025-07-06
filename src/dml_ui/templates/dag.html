@@ -72,12 +72,79 @@
       transform: translate(-50%, -50%);
       z-index: 10;
     }
+    
+    /* DAG Stats styling */
+    .dag-stats-card {
+      transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+      cursor: pointer;
+    }
+    
+    .dag-stats-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .dag-stats-card .card-body {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .dag-stats-card .card-body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+      pointer-events: none;
+    }
   </style>
 {% endblock %}
 
 {% block content %}
 <div class="h-100">
-  <h2>Dag</h2>
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-3 gap-3">
+    <h2 class="mb-0">DAG</h2>
+    <!-- DAG Stats Cards -->
+    <div class="d-flex flex-wrap gap-2">
+      <div class="card border-0 bg-primary text-white dag-stats-card" style="min-width: 80px;">
+        <div class="card-body text-center py-2 px-3">
+          <div class="fs-5 fw-bold">{{ data.nodes|length }}</div>
+          <div class="small opacity-75">Nodes</div>
+        </div>
+      </div>
+      <div class="card border-0 bg-info text-white dag-stats-card" style="min-width: 80px;">
+        <div class="card-body text-center py-2 px-3">
+          <div class="fs-5 fw-bold">{{ data.edges|length }}</div>
+          <div class="small opacity-75">Edges</div>
+        </div>
+      </div>
+      {% set node_types = {} %}
+      {% for node in data.nodes %}
+        {% set _ = node_types.update({node.node_type: node_types.get(node.node_type, 0) + 1}) %}
+      {% endfor %}
+      <div class="card border-0 bg-success text-white dag-stats-card" 
+           style="min-width: 80px;" 
+           data-bs-toggle="tooltip" 
+           data-bs-placement="bottom"
+           data-bs-html="true"
+           title="Node Types:<br>{% for type, count in node_types.items() %}<strong>{{ type }}:</strong> {{ count }}<br>{% endfor %}">
+        <div class="card-body text-center py-2 px-3">
+          <div class="fs-5 fw-bold">{{ node_types|length }}</div>
+          <div class="small opacity-75">Types</div>
+        </div>
+      </div>
+      {% if data.name %}
+      <div class="card border-0 bg-secondary text-white dag-stats-card" style="min-width: 100px; max-width: 150px;">
+        <div class="card-body text-center py-2 px-3">
+          <div class="fs-6 fw-bold text-truncate" title="{{ data.name }}">{{ data.name }}</div>
+          <div class="small opacity-75">Name</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
   <ul class="nav nav-tabs" id="dagTab" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="viz-tab" data-bs-toggle="tab" data-bs-target="#viz" type="button" role="tab" aria-controls="viz" aria-selected="true">Visualization</button>
@@ -272,6 +339,14 @@
   for (const k in logState) {
     logState[k] = { page: 1, nextForwardToken: null, nextBackwardToken: null };
   }
+  
+  // Initialize Bootstrap tooltips for stats cards
+  document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  });
 </script>
 <script>
   const nodeTable = document.querySelector("#nodeTable");

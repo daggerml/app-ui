@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{% block title %}daggerml{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link
+      href="https://bootswatch.com/5/minty/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --color-pastel-cyan: #a8d5e3;
+        --color-dark-teal: #395b50;
+        --color-muted-blue: #7681b3;
+        --color-eggplant: #493548;
+        --color-cream: #f2f0ea;
+        --color-olive-green: #9ea958;
+        --color-soft-red: #ed5b6b;
+        --color-black: #000;
+        --color-darkgrey: #444;
+      }
+
+      /* Breadcrumb styling for navbar */
+      .navbar .breadcrumb {
+        background: none;
+        padding: 0;
+        margin: 0;
+      }
+      
+      .navbar .breadcrumb-item {
+        color: rgba(255, 255, 255, 0.8);
+      }
+      
+      .navbar .breadcrumb-item.active {
+        color: white;
+        font-weight: 500;
+      }
+      
+      .navbar .breadcrumb-item a {
+        color: rgba(255, 255, 255, 0.9);
+        text-decoration: none;
+      }
+      
+      .navbar .breadcrumb-item a:hover {
+        color: white;
+        text-decoration: underline;
+      }
+      
+      .navbar .breadcrumb-item + .breadcrumb-item::before {
+        content: ">";
+        color: rgba(255, 255, 255, 0.6);
+        padding: 0 0.5rem;
+      }
+
+      /* Sidebar styling */
+      .offcanvas-sidebar {
+        width: 320px;
+        border: none;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+      }
+      
+      .sidebar-header {
+        border-bottom: 1px solid var(--bs-border-color);
+        background: var(--bs-light);
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      
+      .sidebar-close-btn {
+        padding: 0.25rem;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease-in-out;
+      }
+      
+      .sidebar-close-btn:hover {
+        background-color: var(--bs-secondary-bg);
+        transform: scale(1.1);
+      }
+      
+      .sidebar-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--bs-emphasis-color);
+        margin: 0;
+        display: flex;
+        align-items: center;
+      }
+      
+      .sidebar-title i {
+        margin-right: 0.75rem;
+        color: var(--bs-primary);
+        font-size: 1.2rem;
+      }
+      
+      .sidebar-body {
+        padding: 1rem 0;
+        max-height: calc(100vh - 140px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--bs-border-color) transparent;
+      }
+      
+      .sidebar-body::-webkit-scrollbar {
+        width: 6px;
+      }
+      
+      .sidebar-body::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      
+      .sidebar-body::-webkit-scrollbar-thumb {
+        background-color: var(--bs-border-color);
+        border-radius: 3px;
+      }
+      
+      .sidebar-body::-webkit-scrollbar-thumb:hover {
+        background-color: var(--bs-secondary);
+      }
+      
+      .sidebar-section {
+        margin-bottom: 0.75rem;
+      }
+      
+      .sidebar-section:last-child {
+        margin-bottom: 0;
+      }
+      
+      .sidebar-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1.5rem 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--bs-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+        cursor: pointer;
+        user-select: none;
+        border-bottom: 1px solid var(--bs-border-color-translucent);
+        margin-bottom: 0.25rem;
+      }
+      
+      .sidebar-section-header:hover {
+        color: var(--bs-emphasis-color);
+      }
+      
+      .sidebar-section-toggle {
+        font-size: 0.75rem;
+        transition: transform 0.2s ease-in-out;
+        color: var(--bs-text-muted);
+      }
+      
+      .sidebar-section-toggle.collapsed {
+        transform: rotate(-90deg);
+      }
+      
+      .sidebar-section-content {
+        transition: all 0.3s ease-in-out;
+      }
+      
+      .sidebar-section-content.collapsed {
+        display: none;
+      }
+      
+      .sidebar-item {
+        margin-bottom: 0.125rem;
+      }
+      
+      .sidebar-item a {
+        display: flex;
+        align-items: center;
+        padding: 0.625rem 1.5rem;
+        color: var(--bs-body-color);
+        text-decoration: none;
+        border-radius: 0;
+        margin: 0;
+        transition: all 0.2s ease-in-out;
+        position: relative;
+        font-weight: 400;
+        font-size: 0.9rem;
+        border-left: 3px solid transparent;
+      }
+      
+      .sidebar-item a:hover {
+        background-color: var(--bs-primary-bg-subtle);
+        color: var(--bs-primary-text-emphasis);
+        border-left-color: var(--bs-primary);
+      }
+      
+      .sidebar-item a.active {
+        background-color: var(--bs-primary-bg-subtle);
+        color: var(--bs-primary-text-emphasis);
+        border-left-color: var(--bs-primary);
+        font-weight: 500;
+      }
+      
+      .sidebar-item i {
+        margin-right: 0.75rem;
+        width: 1rem;
+        text-align: center;
+        flex-shrink: 0;
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+      
+      .sidebar-item a:hover i,
+      .sidebar-item a.active i {
+        opacity: 1;
+      }
+      
+      .sidebar-item-text {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      
+      .sidebar-item-badge {
+        margin-left: auto;
+        font-size: 0.7rem;
+        background-color: var(--bs-secondary);
+        color: white;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+        font-weight: 500;
+        line-height: 1;
+      }
+      
+      .sidebar-divider {
+        height: 1px;
+        background-color: var(--bs-border-color);
+        margin: 0.5rem 0;
+      }
+      
+      .sidebar-empty {
+        text-align: center;
+        padding: 1.5rem 1.5rem;
+        color: var(--bs-text-muted);
+      }
+      
+      .sidebar-empty i {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.5;
+        display: block;
+      }
+      
+      .sidebar-empty-text {
+        font-size: 0.8rem;
+        line-height: 1.4;
+      }
+      
+      /* Error state styling */
+      .sidebar-item.error a {
+        color: var(--bs-danger);
+        border-left-color: var(--bs-danger);
+        background-color: var(--bs-danger-bg-subtle);
+      }
+      
+      .sidebar-item.error a:hover {
+        background-color: var(--bs-danger-bg-subtle);
+        opacity: 0.8;
+      }
+      
+      /* Dark mode support for offcanvas */
+      [data-bs-theme="dark"] .offcanvas {
+        --bs-offcanvas-bg: var(--bs-dark);
+        --bs-offcanvas-color: var(--bs-light);
+      }
+      
+      [data-bs-theme="dark"] .sidebar-header {
+        background: var(--bs-dark);
+        border-bottom-color: var(--bs-border-color);
+      }
+      
+      [data-bs-theme="dark"] .sidebar-close-btn:hover {
+        background-color: var(--bs-gray-800);
+      }
+      
+      [data-bs-theme="dark"] .sidebar-section-header {
+        color: var(--bs-secondary);
+        border-bottom-color: var(--bs-border-color-translucent);
+      }
+      
+      [data-bs-theme="dark"] .sidebar-section-header:hover {
+        color: var(--bs-light);
+      }
+      
+      [data-bs-theme="dark"] .sidebar-item a:hover {
+        background-color: var(--bs-gray-800);
+        border-left-color: var(--bs-primary);
+      }
+      
+      [data-bs-theme="dark"] .sidebar-item a.active {
+        background-color: var(--bs-gray-800);
+        border-left-color: var(--bs-primary);
+      }
+      
+      /* Main content styling */
+      .main-content {
+        padding: 2rem;
+        min-height: calc(100vh - 76px);
+      }
+      
+      /* Sidebar toggle button styling */
+      .sidebar-toggle {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 1.25rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease-in-out;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .sidebar-toggle:hover {
+        color: white;
+        background-color: rgba(255, 255, 255, 0.15);
+        transform: scale(1.05);
+      }
+      
+      .sidebar-toggle:focus {
+        outline: 2px solid rgba(255, 255, 255, 0.5);
+        outline-offset: 2px;
+      }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_header %}{% endblock %}
+  </head>
+  <body>
+    <div class="navbar navbar-expand-lg mb-4 sticky-top bg-primary" data-bs-theme="dark">
+      <div class="container">
+        {% if sidebar is defined and sidebar['sections'] %}
+          <button class="sidebar-toggle me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Toggle sidebar">
+            <i class="bi bi-layout-sidebar-inset"></i>
+          </button>
+        {% endif %}
+        <a class="navbar-brand" href="{{ url_for('main') }}">daggerml</a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNavDropdown"
+          aria-controls="navbarNavDropdown"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNavDropdown">
+          {% if breadcrumbs is defined and breadcrumbs %}
+            <!-- Breadcrumb Navigation -->
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb mb-0">
+                {% for breadcrumb in breadcrumbs %}
+                  <li class="breadcrumb-item">
+                    <a href="{{ breadcrumb.url }}" class="text-decoration-none">
+                      <i class="{{ breadcrumb.icon }}"></i>
+                      <span class="ms-1">{{ breadcrumb.name }}</span>
+                    </a>
+                  </li>
+                {% endfor %}
+              </ol>
+            </nav>
+          {% elif dropdowns is defined %}
+            <!-- Fallback to dropdown navigation -->
+            <ul class="navbar-nav">
+              {% for name, links in dropdowns.items() %}
+                {% include 'nav-dropdown.html' %}
+              {% endfor %}
+            </ul>
+          {% endif %}
+          <div class="d-flex ms-auto">
+            <button id="themeToggle" class="btn">
+              <i id="theme-icon" class="bi"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if sidebar is defined and sidebar['sections'] %}
+      <!-- Bootstrap Offcanvas Sidebar -->
+      <div class="offcanvas offcanvas-start offcanvas-sidebar" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
+        <div class="sidebar-header">
+          <h5 class="sidebar-title" id="sidebarOffcanvasLabel">
+            <i class="bi bi-layout-sidebar-inset"></i>
+            {{ sidebar['title'] }}
+          </h5>
+          <button type="button" class="btn-close sidebar-close-btn" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="sidebar-body">
+          {% for section in sidebar['sections'] %}
+            <div class="sidebar-section">
+              <div class="sidebar-section-header" onclick="toggleSection('{{ section['type'] }}')">
+                <span>{{ section['title'] }}</span>
+                <i class="bi bi-chevron-down sidebar-section-toggle{% if section['collapsed'] %} collapsed{% endif %}" id="toggle-{{ section['type'] }}"></i>
+              </div>
+              <div class="sidebar-section-content{% if section['collapsed'] %} collapsed{% endif %}" id="content-{{ section['type'] }}">
+                {% if section['items'] %}
+                  {% for item in section['items'] %}
+                    <div class="sidebar-item {% if item.get('type') == 'error' %}error{% endif %}">
+                      <a href="{{ item.url }}" class="{% if item.get('active') %}active{% endif %}">
+                        <i class="{{ item.icon }}"></i>
+                        <span class="sidebar-item-text">
+                          {% if item.display_name %}
+                            {{ item.display_name }}
+                          {% else %}
+                            {{ item.name }}
+                          {% endif %}
+                        </span>
+                        {% if item.get('type') == 'dag' and item.get('dag_id') %}
+                          <span class="sidebar-item-badge">{{ item.dag_id[:6] }}</span>
+                        {% elif item.get('type') == 'node' and item.get('node_type') %}
+                          <span class="sidebar-item-badge">{{ item.node_type }}</span>
+                        {% endif %}
+                      </a>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="sidebar-empty">
+                    {% if section['type'] == 'repos' %}
+                      <i class="bi bi-folder2-open"></i>
+                      <div class="sidebar-empty-text">No repositories found</div>
+                    {% elif section['type'] == 'branches' %}
+                      <i class="bi bi-git"></i>
+                      <div class="sidebar-empty-text">No branches found</div>
+                    {% elif section['type'] == 'dags' %}
+                      <i class="bi bi-diagram-3"></i>
+                      <div class="sidebar-empty-text">No DAGs found</div>
+                    {% elif section['type'] == 'nodes' %}
+                      <i class="bi bi-nodes"></i>
+                      <div class="sidebar-empty-text">No nodes found</div>
+                    {% else %}
+                      <i class="bi bi-inbox"></i>
+                      <div class="sidebar-empty-text">No items found</div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Main content -->
+    <div class="container-fluid">
+      <div class="main-content">
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+    <script>
+      // Sidebar section toggle functionality
+      function toggleSection(sectionType) {
+        const toggle = document.getElementById(`toggle-${sectionType}`);
+        const content = document.getElementById(`content-${sectionType}`);
+        
+        if (content && toggle) {
+          const isCollapsed = content.classList.contains('collapsed');
+          
+          if (isCollapsed) {
+            content.classList.remove('collapsed');
+            toggle.classList.remove('collapsed');
+          } else {
+            content.classList.add('collapsed');
+            toggle.classList.add('collapsed');
+          }
+          
+          // Store the state in localStorage
+          localStorage.setItem(`sidebar-section-${sectionType}`, isCollapsed ? 'expanded' : 'collapsed');
+        }
+      }
+      
+      // Restore section states from localStorage
+      document.addEventListener('DOMContentLoaded', function() {
+        const sections = ['repos', 'branches', 'dags', 'nodes'];
+        sections.forEach(sectionType => {
+          const stored = localStorage.getItem(`sidebar-section-${sectionType}`);
+          const toggle = document.getElementById(`toggle-${sectionType}`);
+          const content = document.getElementById(`content-${sectionType}`);
+          
+          if (stored && toggle && content) {
+            if (stored === 'collapsed') {
+              content.classList.add('collapsed');
+              toggle.classList.add('collapsed');
+            } else {
+              content.classList.remove('collapsed');
+              toggle.classList.remove('collapsed');
+            }
+          }
+        });
+      });
+
+      (function() {
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('theme-icon');
+
+        function setTheme(theme) {
+          document.documentElement.setAttribute('data-bs-theme', theme);
+          localStorage.setItem('theme', theme);
+          
+          // Update theme icon
+          if (theme === 'dark') {
+            themeIcon.classList.remove('bi-sun');
+            themeIcon.classList.add('bi-moon');
+          } else {
+            themeIcon.classList.remove('bi-moon');
+            themeIcon.classList.add('bi-sun');
+          }
+          
+          // Update offcanvas close button for dark mode
+          const offcanvasCloseBtn = document.querySelector('#sidebarOffcanvas .sidebar-close-btn');
+          if (offcanvasCloseBtn) {
+            if (theme === 'dark') {
+              offcanvasCloseBtn.classList.add('btn-close-white');
+            } else {
+              offcanvasCloseBtn.classList.remove('btn-close-white');
+            }
+          }
+        }
+
+        let storedTheme = localStorage.getItem('theme');
+        if (storedTheme) {
+          setTheme(storedTheme);
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          setTheme('dark');
+        } else {
+          setTheme('light');
+        }
+
+        themeToggle.addEventListener('click', function() {
+          let currentTheme = document.documentElement.getAttribute('data-bs-theme');
+          setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+        });
+      })();
+    </script>
+  </body>
+</html>
+

@@ -10,6 +10,33 @@ from dml_util.aws.s3 import S3Store
 logger = logging.getLogger(__name__)
 
 
+def filter_nodes(nodes, edges):
+    """Filter out nodes that are dml created and can be pruned
+
+    Examples
+    --------
+    >>> node1 = dag._put("asdf")
+    >>> node2 = dag._put([node1])
+    >>> node3 = node2[0]
+    >>> dag.result = dag.fn(node3)
+
+    `filter_nodes` will remove the edge from `node3` to `dag.result` and replace it with an edge from `node1`.
+    It will then look for all nodes that have no edges and remove those from the nodes list.
+    """
+    filtered_nodes = []
+    filtered_edges = []
+    for node in nodes:
+        print(node.keys())
+        if node["node_type"] == "dml":
+            continue
+        filtered_nodes.append(node)
+        for edge in edges:
+            if edge["source"] == node["id"]:
+                filtered_edges.append(edge)
+    filtered_edges = [edge for edge in filtered_edges if edge["target"] not in [n["id"] for n in nodes if n["node_type"] == "dml"]]
+    return filtered_nodes, filtered_edges
+
+
 def get_sub(resource):
     while (sub := (resource.data or {}).get("sub")) is not None:
         resource = sub

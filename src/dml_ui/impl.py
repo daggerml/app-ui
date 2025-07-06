@@ -4,11 +4,12 @@ import sys
 from argparse import ArgumentParser
 
 from daggerml import Dml
+from daggerml.core import Ref
 from flask import Flask, jsonify, render_template, request, url_for
 
-from dml_ui.app.util import get_dag_info, get_node_info
 from dml_ui.cloudwatch import CloudWatchLogs
 from dml_ui.plugins import discover_plugins
+from dml_ui.util import get_dag_info, get_node_info
 
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
@@ -23,6 +24,148 @@ def get_dropdowns(dml, repo, branch, dag_id):
         dropdowns["dags"] = {k: url_for("dag_route", repo=repo, branch=branch, dag_id=v) for k, v in tmp.items()}
     return dropdowns
 
+def get_breadcrumbs(dml, repo, branch, dag_id, dag_data=None):
+    """Generate breadcrumb navigation data"""
+    breadcrumbs = []
+    # Home breadcrumb
+    breadcrumbs.append({
+        'name': 'Home',
+        'url': url_for('main'),
+        'icon': 'bi-house'
+    })
+    if repo:
+        # Repo breadcrumb
+        breadcrumbs.append({
+            'name': repo,
+            'url': url_for('main', repo=repo),
+            'icon': 'bi-folder'
+        })
+        if branch:
+            # Branch breadcrumb
+            breadcrumbs.append({
+                'name': branch,
+                'url': url_for('main', repo=repo, branch=branch),
+                'icon': 'bi-git'
+            })
+            if dag_id and dag_data:
+                breadcrumbs.append({
+                    "name": dag_id[:12],
+                    "url": url_for("dag_route", repo=repo, branch=branch, dag_id=dag_id),
+                    "icon": "bi-diagram-3",
+                })
+    return breadcrumbs
+
+def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
+    """Generate sidebar navigation data with all sections"""
+    sidebar = {
+        "title": "Navigation", 
+        "sections": [],
+        "current": {"repo": repo, "branch": branch, "dag_id": dag_id}
+    }
+    
+    # Always show repositories section
+    repo_section = {"title": "Repositories", "type": "repos", "items": [], "collapsed": bool(repo)}
+    try:
+        repos = dml("repo", "list")
+        for repo_item in repos:
+            is_current = repo == repo_item["name"]
+            repo_section["items"].append({
+                "name": repo_item["name"],
+                "url": url_for("main", repo=repo_item["name"]),
+                "icon": "bi-folder2" if is_current else "bi-folder",
+                "type": "repo",
+                "active": is_current
+            })
+    except Exception as e:
+        logger.warning(f"Failed to get repositories: {e}")
+        repo_section['items'].append({
+            'name': 'Error loading repositories',
+            'url': '#',
+            'icon': 'bi-exclamation-triangle',
+            'type': 'error'
+        })
+    sidebar["sections"].append(repo_section)
+    
+    # Show branches section if repo is selected
+    if repo:
+        branch_section = {"title": "Branches", "type": "branches", "items": [], "collapsed": bool(branch)}
+        try:
+            branches = dml("branch", "list")
+            for branch_name in branches:
+                is_current = branch == branch_name
+                branch_section['items'].append({
+                    'name': branch_name,
+                    'url': url_for('main', repo=repo, branch=branch_name),
+                    'icon': 'bi-git',
+                    'type': 'branch',
+                    'active': is_current
+                })
+        except Exception as e:
+            logger.warning(f"Failed to get branches for repo {repo}: {e}")
+            branch_section['items'].append({
+                'name': 'Error loading branches',
+                'url': '#',
+                'icon': 'bi-exclamation-triangle',
+                'type': 'error'
+            })
+        sidebar["sections"].append(branch_section)
+    
+    # Show DAGs section if branch is selected
+    if repo and branch:
+        dag_section = {"title": "DAGs", "type": "dags", "items": [], "collapsed": bool(dag_id)}
+        try:
+            dags = dml("dag", "list")
+            for dag_item in dags:
+                dag_name = dag_item.get("name", dag_item["id"][:8])
+                is_current = dag_id == dag_item["id"]
+                dag_section['items'].append({
+                    'name': dag_name,
+                    'display_name': f"{dag_name}" if dag_item.get("name") else dag_item["id"][:8],
+                    'url': url_for('dag_route', repo=repo, branch=branch, dag_id=dag_item["id"]),
+                    'icon': 'bi-diagram-3',
+                    'type': 'dag',
+                    'dag_id': dag_item["id"],
+                    'active': is_current
+                })
+        except Exception as e:
+            logger.warning(f"Failed to get DAGs for {repo}/{branch}: {e}")
+            dag_section['items'].append({
+                'name': 'Error loading DAGs',
+                'url': '#',
+                'icon': 'bi-exclamation-triangle',
+                'type': 'error'
+            })
+        sidebar["sections"].append(dag_section)
+    
+    # Show nodes section if DAG is selected
+    if repo and branch and dag_id and dag_data:
+        node_section = {"title": "Nodes", "type": "nodes", "items": [], "collapsed": False}
+        nodes = dag_data.get("nodes", [])
+        for node in nodes:
+            node_name = node.get("name", f"#{node['id'][:8]}")
+            node_section['items'].append({
+                'name': node_name,
+                'display_name': node_name,
+                'url': url_for('node_route', repo=repo, branch=branch, dag_id=dag_id, node_id=node["id"]),
+                'icon': f'bi-{get_node_icon(node.get("node_type", "unknown"))}',
+                'type': 'node',
+                'node_type': node.get("node_type", "unknown"),
+                'node_id': node["id"]
+            })
+        sidebar["sections"].append(node_section)
+    
+    return sidebar
+
+def get_node_icon(node_type):
+    """Get appropriate icon for node type"""
+    icon_map = {
+        'fn': 'gear',
+        'import': 'box-arrow-in-down',
+        'literal': 'file-text',
+        'argv': 'terminal'
+    }
+    return icon_map.get(node_type, 'circle')
+
 
 cloudwatch_logs = CloudWatchLogs()
 
@@ -32,12 +175,16 @@ def dag_route():
     branch = request.args.get("branch")
     dag_id = request.args.get("dag_id")
     dml = Dml(repo=repo, branch=branch)
-    dropdowns = get_dropdowns(dml, repo, branch, dag_id)
     data = get_dag_info(dml, dag_id)
     data.pop("argv", None)
     # data.update(data.pop("result", {}))
     log_streams = data.pop("log_streams", {})
     dag_data = data.pop("dag_data")
+    
+    # Generate breadcrumbs and sidebar data
+    breadcrumbs = get_breadcrumbs(dml, repo, branch, dag_id, dag_data)
+    sidebar = get_sidebar_data(dml, repo, branch, dag_id, dag_data)
+    
     for node in dag_data["nodes"]:
         node["link"] = url_for(
             "node_route",
@@ -62,7 +209,7 @@ def dag_route():
                     ]
                     for x in node["sublist"]
                 ]
-    return render_template("dag.html", dropdowns=dropdowns, data=dag_data, log_streams=log_streams, **data)
+    return render_template("dag.html", data=dag_data, log_streams=log_streams, breadcrumbs=breadcrumbs, sidebar=sidebar, **data)
 
 @app.route("/node")
 def node_route():
@@ -72,10 +219,19 @@ def node_route():
     node_id = request.args.get("node_id")
     dml = Dml(repo=repo, branch=branch)
     dropdowns = get_dropdowns(dml, repo, branch, dag_id)
+    
+    # Get DAG data for breadcrumbs and sidebar
+    dag_info = get_dag_info(dml, dag_id)
+    dag_data = dag_info.get("dag_data")
+    breadcrumbs = get_breadcrumbs(dml, repo, branch, dag_id, dag_data)
+    sidebar = get_sidebar_data(dml, repo, branch, dag_id, dag_data)
+    
     data = get_node_info(dml, dag_id, node_id)
     return render_template(
         "node.html",
         dropdowns=dropdowns,
+        breadcrumbs=breadcrumbs,
+        sidebar=sidebar,
         dag_id=dag_id,
         dag_link=url_for("dag_route", repo=repo, branch=branch, dag_id=dag_id),
         node_id=node_id,
@@ -88,7 +244,9 @@ def main():
     branch = request.args.get("branch")
     dml = Dml(repo=repo, branch=branch)
     dropdowns = get_dropdowns(dml, repo, branch, None)
-    return render_template("index.html", dropdowns=dropdowns)
+    breadcrumbs = get_breadcrumbs(dml, repo, branch, None, None)
+    sidebar = get_sidebar_data(dml, repo, branch, None, None)
+    return render_template("index.html", dropdowns=dropdowns, breadcrumbs=breadcrumbs, sidebar=sidebar)
 
 @app.route("/logs", methods=["GET"])
 def get_logs():
@@ -333,7 +491,9 @@ def idx():
     branch = request.args.get("branch")
     dml = Dml(repo=repo, branch=branch)
     dropdowns = get_dropdowns(dml, repo, branch, None)
-    return render_template("indexes.html", dropdowns=dropdowns)
+    breadcrumbs = get_breadcrumbs(dml, repo, branch, None, None)
+    sidebar = get_sidebar_data(dml, repo, branch, None, None)
+    return render_template("indexes.html", dropdowns=dropdowns, breadcrumbs=breadcrumbs, sidebar=sidebar)
 
 @app.route("/kill-indexes", methods=["POST"])
 def kill_idx():
