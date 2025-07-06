@@ -20,37 +20,13 @@
       position: relative;
     }
     
-    /* Floating DAG Stats Overlay */
-    .dag-stats-overlay {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: rgba(248, 249, 250, 0.95);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--bs-border-color-translucent);
-      border-radius: 0.375rem;
-      padding: 0.5rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      opacity: 0;
-      visibility: hidden;
-      transform: translateY(-10px);
-      transition: all 0.3s ease;
-      z-index: 1000;
-      max-width: 280px;
-      pointer-events: none;
-    }
-    
-    #cy:hover .dag-stats-overlay {
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-    
-    .dag-stats-overlay:hover {
-      opacity: 1 !important;
-      visibility: visible !important;
-      transform: translateY(0) !important;
+    /* Inline DAG Statistics */
+    .dag-stats-inline {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex: 1;
+      margin: 0 1rem;
     }
     .legend {
       position: absolute;
@@ -106,47 +82,50 @@
       z-index: 10;
     }
     
-    /* DAG Stats styling - Compact & Minimalist */
+    /* DAG Stats Container - Horizontal Layout */
     .dag-stats-container {
-      background: rgba(248, 249, 250, 0.95);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--bs-border-color-translucent);
-      border-radius: 0.375rem;
-      padding: 0.5rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 0.75rem 1.25rem;
       width: 100%;
     }
     
     .dag-stats-header {
-      font-size: 0.8rem;
+      font-size: 0.875rem;
       font-weight: 600;
       color: var(--bs-gray-700);
-      margin-bottom: 0.375rem;
       display: flex;
       align-items: center;
-      gap: 0.25rem;
+      gap: 0.375rem;
+      white-space: nowrap;
+      margin: 0;
     }
     
     .dag-stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(65px, 1fr));
-      gap: 0.375rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
     
     .dag-stat-item {
-      background: white;
+      background: var(--bs-gray-50);
       border: 1px solid var(--bs-border-color-translucent);
-      border-radius: 0.25rem;
-      padding: 0.375rem 0.25rem;
+      border-radius: 0.375rem;
+      padding: 0.375rem 0.625rem;
       text-align: center;
-      transition: border-color 0.15s ease, background-color 0.15s ease;
+      transition: all 0.2s ease;
       cursor: default;
-      position: relative;
+      min-width: 50px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     
     .dag-stat-item:hover {
       border-color: var(--bs-primary);
       background-color: var(--bs-primary-bg-subtle);
+      transform: translateY(-1px);
     }
     
     .dag-stat-item.clickable {
@@ -156,13 +135,14 @@
     .dag-stat-item.clickable:hover {
       background-color: var(--bs-primary);
       color: white;
+      box-shadow: 0 2px 8px rgba(var(--bs-primary-rgb), 0.3);
     }
     
     .dag-stat-value {
       font-size: 1rem;
       font-weight: 700;
-      line-height: 1.1;
-      margin-bottom: 0.1rem;
+      line-height: 1;
+      margin-bottom: 0.125rem;
       color: var(--bs-gray-900);
     }
     
@@ -171,7 +151,7 @@
     }
     
     .dag-stat-label {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       font-weight: 500;
       color: var(--bs-gray-600);
       text-transform: uppercase;
@@ -185,21 +165,20 @@
     }
     
     .dag-stat-meta {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 0.375rem;
-      margin-top: 0.375rem;
-      padding-top: 0.375rem;
-      border-top: 1px solid var(--bs-border-color-translucent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: auto;
     }
     
     .dag-meta-item {
-      background: white;
+      background: var(--bs-gray-50);
       border: 1px solid var(--bs-border-color-translucent);
-      border-radius: 0.25rem;
-      padding: 0.25rem 0.375rem;
+      border-radius: 0.375rem;
+      padding: 0.25rem 0.5rem;
       font-size: 0.7rem;
       color: var(--bs-gray-700);
+      white-space: nowrap;
     }
     
     .dag-meta-label {
@@ -214,15 +193,6 @@
     }
     
     /* Dark mode support */
-    [data-bs-theme="dark"] .dag-stats-overlay {
-      background: rgba(33, 37, 41, 0.95);
-    }
-    
-    [data-bs-theme="dark"] .dag-stats-container {
-      background: rgba(33, 37, 41, 0.95);
-      border-color: var(--bs-border-color);
-    }
-    
     [data-bs-theme="dark"] .dag-stat-item {
       background: var(--bs-gray-800);
       border-color: var(--bs-border-color);
@@ -270,10 +240,83 @@
 
 {% block content %}
 <div class="h-100">
+  <!-- Header Row with DAG Title, Stats, and Filter -->
   <div class="d-flex align-items-center mb-3 gap-3">
     <h2 class="mb-0">DAG</h2>
-    <!-- Filter Nodes Checkbox -->
-    <div class="form-check form-switch filter-nodes-container">
+    
+    <!-- DAG Statistics Inline -->
+    <div class="dag-stats-inline">
+      <div class="dag-stats-grid">
+        <div class="dag-stat-item">
+          <div class="dag-stat-value">{{ data.nodes|length }}</div>
+          <div class="dag-stat-label">Nodes</div>
+        </div>
+        
+        <div class="dag-stat-item">
+          <div class="dag-stat-value">{{ data.edges|length }}</div>
+          <div class="dag-stat-label">Edges</div>
+        </div>
+        
+        {% set node_types = {} %}
+        {% for node in data.nodes %}
+          {% set _ = node_types.update({node.node_type: node_types.get(node.node_type, 0) + 1}) %}
+        {% endfor %}
+        
+        <div class="dag-stat-item clickable" 
+             data-bs-toggle="tooltip" 
+             data-bs-placement="bottom"
+             data-bs-html="true"
+             title="Node Types:<br>{% for type, count in node_types.items() %}<strong>{{ type }}:</strong> {{ count }}<br>{% endfor %}">
+          <div class="dag-stat-value">{{ node_types|length }}</div>
+          <div class="dag-stat-label">Types</div>
+        </div>
+        
+        <!-- Calculate execution stats if available -->
+        {% set executed_nodes = data.nodes | selectattr('executed', 'defined') | list %}
+        {% if executed_nodes %}
+        <div class="dag-stat-item">
+          <div class="dag-stat-value">{{ executed_nodes | length }}</div>
+          <div class="dag-stat-label">Executed</div>
+        </div>
+        {% endif %}
+        
+        <!-- Calculate depth (longest path) -->
+        {% set max_depth = 0 %}
+        {% for node in data.nodes %}
+          {% if node.get('depth', 0) > max_depth %}
+            {% set max_depth = node.depth %}
+          {% endif %}
+        {% endfor %}
+        {% if max_depth > 0 %}
+        <div class="dag-stat-item">
+          <div class="dag-stat-value">{{ max_depth }}</div>
+          <div class="dag-stat-label">Depth</div>
+        </div>
+        {% endif %}
+      </div>
+      
+      <!-- Metadata Section -->
+      {% if data.name or data.id %}
+      <div class="dag-stat-meta">
+        {% if data.name %}
+        <div class="dag-meta-item">
+          <div class="dag-meta-label">Name</div>
+          <div class="dag-meta-value" title="{{ data.name }}">{{ data.name }}</div>
+        </div>
+        {% endif %}
+        
+        {% if data.id %}
+        <div class="dag-meta-item">
+          <div class="dag-meta-label">ID</div>
+          <div class="dag-meta-value" title="{{ data.id }}">{{ data.id[:12] }}{% if data.id|length > 12 %}...{% endif %}</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    
+    <!-- Filter Nodes Checkbox - moved to end -->
+    <div class="form-check form-switch filter-nodes-container ms-auto">
       <input class="form-check-input" type="checkbox" id="filterNodesSwitch" checked style="transform: scale(0.9);">
       <label class="form-check-label text-muted small" for="filterNodesSwitch" style="font-size: 0.85rem;">
         Filter nodes
@@ -324,85 +367,6 @@
         <button class="btn btn-outline-secondary btn-sm" id="cy-reset" title="Reset View"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
       </div>
       <div id="cy">
-        <!-- DAG Stats Overlay -->
-        <div class="dag-stats-overlay">
-          <div class="dag-stats-container">
-            <div class="dag-stats-header">
-              <i class="bi bi-bar-chart-line"></i>
-              DAG Statistics
-            </div>
-            
-            <!-- Core Stats Grid -->
-            <div class="dag-stats-grid">
-              <div class="dag-stat-item">
-                <div class="dag-stat-value">{{ data.nodes|length }}</div>
-                <div class="dag-stat-label">Nodes</div>
-              </div>
-              
-              <div class="dag-stat-item">
-                <div class="dag-stat-value">{{ data.edges|length }}</div>
-                <div class="dag-stat-label">Edges</div>
-              </div>
-              
-              {% set node_types = {} %}
-              {% for node in data.nodes %}
-                {% set _ = node_types.update({node.node_type: node_types.get(node.node_type, 0) + 1}) %}
-              {% endfor %}
-              
-              <div class="dag-stat-item clickable" 
-                   data-bs-toggle="tooltip" 
-                   data-bs-placement="bottom"
-                   data-bs-html="true"
-                   title="Node Types:<br>{% for type, count in node_types.items() %}<strong>{{ type }}:</strong> {{ count }}<br>{% endfor %}">
-                <div class="dag-stat-value">{{ node_types|length }}</div>
-                <div class="dag-stat-label">Types</div>
-              </div>
-              
-              <!-- Calculate execution stats if available -->
-              {% set executed_nodes = data.nodes | selectattr('executed', 'defined') | list %}
-              {% if executed_nodes %}
-              <div class="dag-stat-item">
-                <div class="dag-stat-value">{{ executed_nodes | length }}</div>
-                <div class="dag-stat-label">Executed</div>
-              </div>
-              {% endif %}
-              
-              <!-- Calculate depth (longest path) -->
-              {% set max_depth = 0 %}
-              {% for node in data.nodes %}
-                {% if node.get('depth', 0) > max_depth %}
-                  {% set max_depth = node.depth %}
-                {% endif %}
-              {% endfor %}
-              {% if max_depth > 0 %}
-              <div class="dag-stat-item">
-                <div class="dag-stat-value">{{ max_depth }}</div>
-                <div class="dag-stat-label">Depth</div>
-              </div>
-              {% endif %}
-            </div>
-            
-            <!-- Metadata Section -->
-            {% if data.name or data.id %}
-            <div class="dag-stat-meta">
-              {% if data.name %}
-              <div class="dag-meta-item">
-                <div class="dag-meta-label">Name</div>
-                <div class="dag-meta-value" title="{{ data.name }}">{{ data.name }}</div>
-              </div>
-              {% endif %}
-              
-              {% if data.id %}
-              <div class="dag-meta-item">
-                <div class="dag-meta-label">ID</div>
-                <div class="dag-meta-value" title="{{ data.id }}">{{ data.id[:12] }}{% if data.id|length > 12 %}...{% endif %}</div>
-              </div>
-              {% endif %}
-            </div>
-            {% endif %}
-          </div>
-        </div>
-        
         <div class="legend" id="cy-legend">
           <h3>Shape</h3>
           <div class="legend-item">
