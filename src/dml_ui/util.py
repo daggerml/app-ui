@@ -85,8 +85,7 @@ def get_dag_info(dml, dag_id):
                 node["sublist"] = [
                     x["source"] for x in dag_data["edges"] if x["type"] == "node" and x["target"] == node["id"]
                 ]
-            (tgt_dag,) = [x["target"] for x in dag_data["edges"] if x["type"] == "dag" and x["source"] == node["id"]]
-            node["parent"] = tgt_dag
+            (node["parent"],) = [x["source"] for x in dag_data["edges"] if x["type"] == "dag" and x["target"] == node["id"]]
     if dag_data.get("argv"):
         node = dml.get_node_value(Ref(dag_data["argv"]))
         out["script"] = (get_sub(node[0]).data or {}).get("script")

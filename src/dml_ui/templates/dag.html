@@ -19,6 +19,39 @@
       height: 60vh;
       position: relative;
     }
+    
+    /* Floating DAG Stats Overlay */
+    .dag-stats-overlay {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(248, 249, 250, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--bs-border-color-translucent);
+      border-radius: 0.375rem;
+      padding: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      max-width: 280px;
+      pointer-events: none;
+    }
+    
+    #cy:hover .dag-stats-overlay {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    
+    .dag-stats-overlay:hover {
+      opacity: 1 !important;
+      visibility: visible !important;
+      transform: translateY(0) !important;
+    }
     .legend {
       position: absolute;
       bottom: 20px;
@@ -73,76 +106,178 @@
       z-index: 10;
     }
     
-    /* DAG Stats styling */
-    .dag-stats-card {
-      transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    /* DAG Stats styling - Compact & Minimalist */
+    .dag-stats-container {
+      background: rgba(248, 249, 250, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--bs-border-color-translucent);
+      border-radius: 0.375rem;
+      padding: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      width: 100%;
+    }
+    
+    .dag-stats-header {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--bs-gray-700);
+      margin-bottom: 0.375rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    
+    .dag-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(65px, 1fr));
+      gap: 0.375rem;
+    }
+    
+    .dag-stat-item {
+      background: white;
+      border: 1px solid var(--bs-border-color-translucent);
+      border-radius: 0.25rem;
+      padding: 0.375rem 0.25rem;
+      text-align: center;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+      cursor: default;
+      position: relative;
+    }
+    
+    .dag-stat-item:hover {
+      border-color: var(--bs-primary);
+      background-color: var(--bs-primary-bg-subtle);
+    }
+    
+    .dag-stat-item.clickable {
       cursor: pointer;
     }
     
-    .dag-stats-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    .dag-stat-item.clickable:hover {
+      background-color: var(--bs-primary);
+      color: white;
     }
     
-    .dag-stats-card .card-body {
-      position: relative;
-      overflow: hidden;
+    .dag-stat-value {
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 0.1rem;
+      color: var(--bs-gray-900);
     }
     
-    .dag-stats-card .card-body::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
-      pointer-events: none;
+    .dag-stat-item:hover .dag-stat-value {
+      color: inherit;
+    }
+    
+    .dag-stat-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--bs-gray-600);
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      line-height: 1;
+    }
+    
+    .dag-stat-item:hover .dag-stat-label {
+      color: inherit;
+      opacity: 0.9;
+    }
+    
+    .dag-stat-meta {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.375rem;
+      margin-top: 0.375rem;
+      padding-top: 0.375rem;
+      border-top: 1px solid var(--bs-border-color-translucent);
+    }
+    
+    .dag-meta-item {
+      background: white;
+      border: 1px solid var(--bs-border-color-translucent);
+      border-radius: 0.25rem;
+      padding: 0.25rem 0.375rem;
+      font-size: 0.7rem;
+      color: var(--bs-gray-700);
+    }
+    
+    .dag-meta-label {
+      font-weight: 600;
+      margin-bottom: 0.05rem;
+    }
+    
+    .dag-meta-value {
+      font-family: var(--bs-font-monospace);
+      color: var(--bs-gray-900);
+      word-break: break-all;
+    }
+    
+    /* Dark mode support */
+    [data-bs-theme="dark"] .dag-stats-overlay {
+      background: rgba(33, 37, 41, 0.95);
+    }
+    
+    [data-bs-theme="dark"] .dag-stats-container {
+      background: rgba(33, 37, 41, 0.95);
+      border-color: var(--bs-border-color);
+    }
+    
+    [data-bs-theme="dark"] .dag-stat-item {
+      background: var(--bs-gray-800);
+      border-color: var(--bs-border-color);
+    }
+    
+    [data-bs-theme="dark"] .dag-stat-item:hover {
+      border-color: var(--bs-primary);
+      background-color: var(--bs-primary);
+    }
+    
+    [data-bs-theme="dark"] .dag-meta-item {
+      background: var(--bs-gray-800);
+      border-color: var(--bs-border-color);
+    }
+    
+    /* Filter nodes styling */
+    .filter-nodes-container {
+      opacity: 0.7;
+      transition: opacity 0.2s ease-in-out;
+    }
+    
+    .filter-nodes-container:hover {
+      opacity: 1;
+    }
+    
+    .filter-nodes-container .form-check-input {
+      border-color: var(--bs-border-color);
+      transition: all 0.2s ease-in-out;
+    }
+    
+    .filter-nodes-container .form-check-input:focus {
+      box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+    }
+    
+    .filter-nodes-container .form-check-label {
+      cursor: pointer;
+      transition: color 0.2s ease-in-out;
+    }
+    
+    .filter-nodes-container:hover .form-check-label {
+      color: var(--bs-body-color) !important;
     }
   </style>
 {% endblock %}
 
 {% block content %}
 <div class="h-100">
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-3 gap-3">
+  <div class="d-flex align-items-center mb-3 gap-3">
     <h2 class="mb-0">DAG</h2>
-    <!-- DAG Stats Cards -->
-    <div class="d-flex flex-wrap gap-2">
-      <div class="card border-0 bg-primary text-white dag-stats-card" style="min-width: 80px;">
-        <div class="card-body text-center py-2 px-3">
-          <div class="fs-5 fw-bold">{{ data.nodes|length }}</div>
-          <div class="small opacity-75">Nodes</div>
-        </div>
-      </div>
-      <div class="card border-0 bg-info text-white dag-stats-card" style="min-width: 80px;">
-        <div class="card-body text-center py-2 px-3">
-          <div class="fs-5 fw-bold">{{ data.edges|length }}</div>
-          <div class="small opacity-75">Edges</div>
-        </div>
-      </div>
-      {% set node_types = {} %}
-      {% for node in data.nodes %}
-        {% set _ = node_types.update({node.node_type: node_types.get(node.node_type, 0) + 1}) %}
-      {% endfor %}
-      <div class="card border-0 bg-success text-white dag-stats-card" 
-           style="min-width: 80px;" 
-           data-bs-toggle="tooltip" 
-           data-bs-placement="bottom"
-           data-bs-html="true"
-           title="Node Types:<br>{% for type, count in node_types.items() %}<strong>{{ type }}:</strong> {{ count }}<br>{% endfor %}">
-        <div class="card-body text-center py-2 px-3">
-          <div class="fs-5 fw-bold">{{ node_types|length }}</div>
-          <div class="small opacity-75">Types</div>
-        </div>
-      </div>
-      {% if data.name %}
-      <div class="card border-0 bg-secondary text-white dag-stats-card" style="min-width: 100px; max-width: 150px;">
-        <div class="card-body text-center py-2 px-3">
-          <div class="fs-6 fw-bold text-truncate" title="{{ data.name }}">{{ data.name }}</div>
-          <div class="small opacity-75">Name</div>
-        </div>
-      </div>
-      {% endif %}
+    <!-- Filter Nodes Checkbox -->
+    <div class="form-check form-switch filter-nodes-container">
+      <input class="form-check-input" type="checkbox" id="filterNodesSwitch" checked style="transform: scale(0.9);">
+      <label class="form-check-label text-muted small" for="filterNodesSwitch" style="font-size: 0.85rem;">
+        Filter nodes
+      </label>
     </div>
   </div>
   <ul class="nav nav-tabs" id="dagTab" role="tablist">
@@ -189,6 +324,85 @@
         <button class="btn btn-outline-secondary btn-sm" id="cy-reset" title="Reset View"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
       </div>
       <div id="cy">
+        <!-- DAG Stats Overlay -->
+        <div class="dag-stats-overlay">
+          <div class="dag-stats-container">
+            <div class="dag-stats-header">
+              <i class="bi bi-bar-chart-line"></i>
+              DAG Statistics
+            </div>
+            
+            <!-- Core Stats Grid -->
+            <div class="dag-stats-grid">
+              <div class="dag-stat-item">
+                <div class="dag-stat-value">{{ data.nodes|length }}</div>
+                <div class="dag-stat-label">Nodes</div>
+              </div>
+              
+              <div class="dag-stat-item">
+                <div class="dag-stat-value">{{ data.edges|length }}</div>
+                <div class="dag-stat-label">Edges</div>
+              </div>
+              
+              {% set node_types = {} %}
+              {% for node in data.nodes %}
+                {% set _ = node_types.update({node.node_type: node_types.get(node.node_type, 0) + 1}) %}
+              {% endfor %}
+              
+              <div class="dag-stat-item clickable" 
+                   data-bs-toggle="tooltip" 
+                   data-bs-placement="bottom"
+                   data-bs-html="true"
+                   title="Node Types:<br>{% for type, count in node_types.items() %}<strong>{{ type }}:</strong> {{ count }}<br>{% endfor %}">
+                <div class="dag-stat-value">{{ node_types|length }}</div>
+                <div class="dag-stat-label">Types</div>
+              </div>
+              
+              <!-- Calculate execution stats if available -->
+              {% set executed_nodes = data.nodes | selectattr('executed', 'defined') | list %}
+              {% if executed_nodes %}
+              <div class="dag-stat-item">
+                <div class="dag-stat-value">{{ executed_nodes | length }}</div>
+                <div class="dag-stat-label">Executed</div>
+              </div>
+              {% endif %}
+              
+              <!-- Calculate depth (longest path) -->
+              {% set max_depth = 0 %}
+              {% for node in data.nodes %}
+                {% if node.get('depth', 0) > max_depth %}
+                  {% set max_depth = node.depth %}
+                {% endif %}
+              {% endfor %}
+              {% if max_depth > 0 %}
+              <div class="dag-stat-item">
+                <div class="dag-stat-value">{{ max_depth }}</div>
+                <div class="dag-stat-label">Depth</div>
+              </div>
+              {% endif %}
+            </div>
+            
+            <!-- Metadata Section -->
+            {% if data.name or data.id %}
+            <div class="dag-stat-meta">
+              {% if data.name %}
+              <div class="dag-meta-item">
+                <div class="dag-meta-label">Name</div>
+                <div class="dag-meta-value" title="{{ data.name }}">{{ data.name }}</div>
+              </div>
+              {% endif %}
+              
+              {% if data.id %}
+              <div class="dag-meta-item">
+                <div class="dag-meta-label">ID</div>
+                <div class="dag-meta-value" title="{{ data.id }}">{{ data.id[:12] }}{% if data.id|length > 12 %}...{% endif %}</div>
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        
         <div class="legend" id="cy-legend">
           <h3>Shape</h3>
           <div class="legend-item">
@@ -340,12 +554,42 @@
     logState[k] = { page: 1, nextForwardToken: null, nextBackwardToken: null };
   }
   
-  // Initialize Bootstrap tooltips for stats cards
+  // Initialize Bootstrap tooltips for stats cards and enhanced stats functionality
   document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
       return new bootstrap.Tooltip(tooltipTriggerEl);
     });
+    
+    // Enhanced stats functionality
+    const statsContainer = document.querySelector('.dag-stats-container');
+    if (statsContainer) {
+      // Add click handlers for clickable stats
+      const clickableStats = statsContainer.querySelectorAll('.dag-stat-item.clickable');
+      clickableStats.forEach(function(statItem) {
+        statItem.addEventListener('click', function() {
+          // For now, just trigger the tooltip to show
+          const tooltip = bootstrap.Tooltip.getInstance(this);
+          if (tooltip) {
+            tooltip.show();
+            setTimeout(() => tooltip.hide(), 3000);
+          }
+        });
+      });
+      
+      // Smooth reveal animation for stats
+      const statItems = statsContainer.querySelectorAll('.dag-stat-item');
+      statItems.forEach(function(item, index) {
+        item.style.opacity = '0';
+        item.style.transform = 'translateY(10px)';
+        setTimeout(function() {
+          item.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+          item.style.opacity = '1';
+          item.style.transform = 'translateY(0)';
+        }, index * 50);
+      });
+    }
   });
 </script>
 <script>
@@ -700,6 +944,40 @@
           </div>
         </div>
       `;
+    }
+  });
+
+  // Filter nodes functionality
+  document.addEventListener('DOMContentLoaded', function() {
+    const filterSwitch = document.getElementById('filterNodesSwitch');
+    
+    if (filterSwitch) {
+      const container = filterSwitch.closest('.filter-nodes-container');
+      
+      // Set initial state based on checkbox checked attribute
+      if (filterSwitch.checked) {
+        container.style.opacity = '1';
+        console.log('Filter nodes enabled (default)');
+        // TODO: Implement initial filter state here
+      } else {
+        container.style.opacity = '0.7';
+      }
+      
+      filterSwitch.addEventListener('change', function() {
+        const isChecked = this.checked;
+        
+        // Add visual feedback
+        if (isChecked) {
+          container.style.opacity = '1';
+          // Placeholder for filter functionality
+          console.log('Filter nodes enabled');
+          // TODO: Implement actual node filtering logic here
+        } else {
+          container.style.opacity = '0.7';
+          console.log('Filter nodes disabled');
+          // TODO: Reset node visibility here
+        }
+      });
     }
   });
 </script>
