@@ -4,7 +4,6 @@ import sys
 from argparse import ArgumentParser
 
 from daggerml import Dml
-from daggerml.core import Ref
 from flask import Flask, jsonify, render_template, request, url_for
 
 from dml_ui.cloudwatch import CloudWatchLogs
@@ -138,16 +137,6 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
         sidebar["sections"].append(dag_section)
     
     return sidebar
-
-def get_node_icon(node_type):
-    """Get appropriate icon for node type"""
-    icon_map = {
-        'fn': 'gear',
-        'import': 'box-arrow-in-down',
-        'literal': 'file-text',
-        'argv': 'terminal'
-    }
-    return icon_map.get(node_type, 'circle')
 
 
 cloudwatch_logs = CloudWatchLogs()
@@ -485,19 +474,11 @@ def api_dag_data():
         dag_id = request.args.get("dag_id")
         prune = request.args.get("prune", "false").lower() == "true"
         
-        print(f"DEBUG: API call with repo={repo}, branch={branch}, dag_id={dag_id}, prune={prune}")
-        
         if not dag_id:
-            print("DEBUG: Missing dag_id parameter")
             return jsonify({"error": "dag_id parameter is required"}), 400
         
-        print(f"DEBUG: Creating Dml instance with repo={repo}, branch={branch}")
         dml = Dml(repo=repo, branch=branch)
-        
-        print(f"DEBUG: Calling get_dag_info with dag_id={dag_id}, prune={prune}")
         data = get_dag_info(dml, dag_id, prune=prune)
-        print(f"DEBUG: get_dag_info returned data keys: {list(data.keys()) if data else 'None'}")
-        print(f"DEBUG: get_dag_info returned data keys: {list(data.keys()) if data else 'None'}")
         
         # Extract components, keeping argv for frontend
         log_streams = data.pop("log_streams", {})
@@ -515,7 +496,6 @@ def api_dag_data():
                 elif isinstance(argv_node_ids, list):
                     pass  # Already a list
                 else:
-                    print(f"DEBUG: Unexpected argv type: {type(argv_node_ids)}")
                     argv_node_ids = []
                 
                 # Create navigation links for each argv node
@@ -534,14 +514,8 @@ def api_dag_data():
                         )
                         argv_data.append(node_with_link)
             except Exception as e:
-                print(f"DEBUG: Error processing argv data: {e}")
+                logger.error(f"Error processing argv data: {e}")
                 argv_data = []
-        
-        print(f"DEBUG: dag_data has {len(dag_data.get('nodes', []))} nodes and {len(dag_data.get('edges', []))} edges")
-        print(f"DEBUG: dag_data keys: {list(dag_data.keys()) if dag_data else 'None'}")
-        print(f"DEBUG: dag_data argv value: {dag_data.get('argv')}")
-        print(f"DEBUG: argv_data processed: {argv_data}")
-        print(f"DEBUG: argv_data length: {len(argv_data)}")
         
         # Add node links for frontend navigation
         for node in dag_data["nodes"]:
@@ -577,13 +551,9 @@ def api_dag_data():
             **data  # Include script, error, result, html_uri etc.
         }
         
-        print(f"DEBUG: Returning response with keys: {list(response_data.keys())}")
-        print(f"DEBUG: Response dag_data has {len(response_data['dag_data'].get('nodes', []))} nodes")
-        
         return jsonify(response_data)
         
     except Exception as e:
-        print(f"DEBUG: Exception in api_dag_data: {e}")
         logger.error(f"Error fetching DAG data: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 

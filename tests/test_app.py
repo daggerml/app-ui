@@ -1,16 +1,19 @@
 from tempfile import TemporaryDirectory
+import unittest
 from unittest import skipUnless
+import os
 
 from daggerml import Dml, Error, Resource
 
 from dml_util import funkify
-from dml_util.app.impl import app
-from dml_util.app.util import get_dag_info, get_sub
-from tests.util import RUN_SLOW_TESTS, FullDmlTestCase
+from dml_ui.impl import app
+from dml_ui.util import get_dag_info, get_sub
 
+# Simple flag for controlling slow tests
+RUN_SLOW_TESTS = os.environ.get("RUN_SLOW_TESTS", "true").lower() == "true"
 
 @skipUnless(RUN_SLOW_TESTS, "Skipping slow tests")
-class TestAppUtil(FullDmlTestCase):
+class TestAppUtil(unittest.TestCase):
     def test_get_sub(self):
         resource = Resource("uri0", data={"sub": Resource("uri1", data={"sub": Resource("uri2")})})
         assert get_sub(resource) == Resource("uri2")
@@ -62,10 +65,10 @@ class TestAppUtil(FullDmlTestCase):
 
 
 @skipUnless(RUN_SLOW_TESTS, "Skipping slow tests")
-class TestAppWeb(FullDmlTestCase):
+class TestAppWeb(unittest.TestCase):
     def test_page_root(self):
         with TemporaryDirectory(prefix="dml-util-test-") as tmpd:
-            with Dml.temporary(cache_path=tmpd) as dml:
+            with Dml.temporary(cache_path=tmpd):
                 client = app.test_client()
                 response = client.get("/")
                 self.assertEqual(response.status_code, 200)
@@ -76,7 +79,7 @@ class TestAppWeb(FullDmlTestCase):
 
     def test_page_repo(self):
         with TemporaryDirectory(prefix="dml-util-test-") as tmpd:
-            with Dml.temporary(cache_path=tmpd) as dml:
+            with Dml.temporary(cache_path=tmpd):
                 client = app.test_client()
                 response = client.get("/?repo=test")
                 self.assertEqual(response.status_code, 200)

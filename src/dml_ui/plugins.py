@@ -1,17 +1,7 @@
-import base64
 from flask import url_for
 import importlib.metadata
-import io
 
-from daggerml import Dag, Node
-
-# Configure matplotlib backend before any imports to prevent GUI issues
-try:
-    import matplotlib
-    matplotlib.use('Agg')  # Use Anti-Grain Geometry backend (no GUI)
-except ImportError:
-    # matplotlib not available, plugins will handle this gracefully
-    pass
+from daggerml import Dag
 
 class DashboardPlugin:
     NAME = None
@@ -54,14 +44,12 @@ def discover_plugins():
     plugins = []
     seen_names = set()
     
-    # First, add built-in plugins (excluding matplotlib for now due to threading issues)
-    built_in_plugins = [DAGInfoPlugin, SimpleStatsPlugin, DMLExplorerPlugin]  # Temporarily removed MatplotlibStatsPlugin
+    # Add built-in plugins
+    built_in_plugins = [DAGInfoPlugin, SimpleStatsPlugin, DMLExplorerPlugin]
     
     for plugin_cls in built_in_plugins:
         try:
             if plugin_cls.NAME and plugin_cls.NAME not in seen_names:
-                # Test plugin instantiation to catch early errors
-                test_instance = plugin_cls()
                 plugins.append(plugin_cls)
                 seen_names.add(plugin_cls.NAME)
         except Exception as e:
@@ -75,8 +63,6 @@ def discover_plugins():
                 if (issubclass(plugin_cls, DashboardPlugin) and 
                     plugin_cls.NAME and 
                     plugin_cls.NAME not in seen_names):
-                    # Test plugin instantiation to catch early errors
-                    test_instance = plugin_cls()
                     plugins.append(plugin_cls)
                     seen_names.add(plugin_cls.NAME)
             except Exception as e:
@@ -139,55 +125,6 @@ class DAGInfoPlugin(DashboardPlugin):
         """
         
         return html
-
-class MatplotlibStatsPlugin(DashboardPlugin):
-    NAME = "Stats Chart"
-    DESCRIPTION = "Shows a matplotlib chart of DAG stats"
-
-    def render(self, dml, dag, **kwargs):
-        try:
-            import matplotlib.pyplot as plt
-            
-            # Extract nodes and edges from the raw dag object
-            nodes = dag.get("nodes", [])
-            edges = dag.get("edges", [])
-            
-            fig, ax = plt.subplots(figsize=(8, 6))
-            ax.bar(["Nodes", "Edges"], [len(nodes), len(edges)])
-            ax.set_title("DAG Statistics")
-            ax.set_ylabel("Count")
-            
-            buf = io.BytesIO()
-            fig.savefig(buf, format="png", dpi=150, bbox_inches='tight')
-            buf.seek(0)
-            img_b64 = base64.b64encode(buf.read()).decode("utf-8")
-            
-            # Clean up the figure to free memory
-            plt.close(fig)
-            
-            return f"""
-            <div class="text-center">
-                <h4>DAG Statistics Chart</h4>
-                <img src="data:image/png;base64,{img_b64}" 
-                     alt="DAG Stats Chart" 
-                     class="img-fluid" 
-                     style="max-width: 100%; height: auto;">
-            </div>
-            """
-        except ImportError:
-            return """
-            <div class="alert alert-warning">
-                <h4>Matplotlib not available</h4>
-                <p>Install matplotlib to view charts: <code>pip install matplotlib</code></p>
-            </div>
-            """
-        except Exception as e:
-            return f"""
-            <div class="alert alert-danger">
-                <h4>Chart Error</h4>
-                <p>Failed to generate chart: {str(e)}</p>
-            </div>
-            """
 
 class SimpleStatsPlugin(DashboardPlugin):
     NAME = "Simple Stats"

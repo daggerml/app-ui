@@ -25,31 +25,7 @@ class CloudWatchLogs:
         limit: int = 1000,
         start_from_head: bool = True
     ) -> Dict:
-        """
-        Get log events from CloudWatch.
-
-        Parameters
-        ----------
-        log_group_name : str
-            Name of the CloudWatch log group
-        log_stream_name : str
-            Name of the CloudWatch log stream
-        start_time : int, optional
-            Start time in milliseconds since epoch
-        end_time : int, optional
-            End time in milliseconds since epoch
-        next_token : str, optional
-            Token for pagination
-        limit : int, default=1000
-            Maximum number of log events to return
-        start_from_head : bool, default=True
-            If True, read events from oldest to newest
-
-        Returns
-        -------
-        Dict
-            Dictionary containing the log events and pagination tokens
-        """
+        """Get log events from CloudWatch with optional time range and pagination."""
         if not self.client:
             logger.warning("CloudWatch logs client unavailable")
             return {
@@ -95,25 +71,7 @@ class CloudWatchLogs:
         next_token: Optional[str] = None,
         limit: int = 50,
     ) -> Dict:
-        """
-        Get log streams from CloudWatch.
-
-        Parameters
-        ----------
-        log_group_name : str
-            Name of the CloudWatch log group
-        prefix : str, optional
-            Filter by log stream name prefix
-        next_token : str, optional
-            Token for pagination
-        limit : int, default=50
-            Maximum number of log streams to return
-
-        Returns
-        -------
-        Dict
-            Dictionary containing the log streams and next token
-        """
+        """Get log streams from CloudWatch with optional filtering."""
         if not self.client:
             logger.warning("CloudWatch logs client unavailable")
             return {
