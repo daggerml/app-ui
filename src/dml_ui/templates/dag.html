@@ -1,5 +1,22 @@
 {% extends "layout.html" %} {% block title %}DAG{% endblock %}
 
+{#
+  DAG Visualization Template
+  
+  This template displays a directed acyclic graph (DAG) with interactive visualization
+  using Cytoscape.js. It includes multiple tabs for different views:
+  - Graph: Interactive network visualization of nodes and edges
+  - Result: Display of DAG execution results
+  - Logs: Stdout/stderr output from DAG execution
+  - Arguments: Command-line arguments passed to the DAG
+  
+  The template expects the following context variables:
+  - dag_data: Dictionary containing nodes, edges, and metadata
+  - result: DAG execution result (optional)
+  - log_streams: Dictionary with stdout/stderr log information (optional)
+  - argv: List of argument node data (optional)
+#}
+
 {% block extra_header %}
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.js"></script>
@@ -803,7 +820,20 @@
       }).join('');
   }
 
-  // Function to show tabs based on available data
+  /**
+   * Updates the visibility of tabs based on available data.
+   * 
+   * This function controls which tabs are shown in the DAG interface by checking
+   * if the corresponding data is available and non-empty.
+   * 
+   * @param {Object} data - The DAG data object containing various optional properties
+   * @param {Array} data.argv - Array of argument nodes (shows argv tab if non-empty)
+   * @param {string} data.script - Script content (shows code tab if present)
+   * @param {Object} data.log_streams - Log stream data (shows logs tab if non-empty)
+   * @param {string} data.error - Error information (shows error tab if present)
+   * @param {*} data.result - DAG result (shows result tab if present)
+   * @param {string} data.html_uri - HTML content URI (shows HTML tab if present)
+   */
   function updateTabVisibility(data) {
     const tabMap = {
       'argv-tab-container': data.argv && data.argv.length > 0,
@@ -822,7 +852,17 @@
     }
   }
 
-  // Function to populate tab content
+  /**
+   * Populates tab content with data from the DAG.
+   * 
+   * This function fills in the content areas for each tab type based on the
+   * available data, formatting code blocks and error messages appropriately.
+   * 
+   * @param {Object} data - The DAG data object
+   * @param {string} data.script - Python script content for syntax highlighting
+   * @param {string} data.error - Error message and stack trace
+   * @param {*} data.result - DAG execution result to be displayed
+   */
   function populateTabContent(data) {
     // Code tab
     if (data.script) {

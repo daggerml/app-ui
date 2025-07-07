@@ -1,3 +1,23 @@
+{#
+  Node Detail Template
+  
+  This template displays detailed information about a specific node in a DAG.
+  It uses a tabbed interface to organize different types of node data:
+  - Value: The computed value/result of the node
+  - Arguments: Individual command-line arguments if this is an argv node
+  - Code: Associated script content if available
+  - Error: Stack trace if the node resulted in an error
+  - HTML: Rendered HTML content if the node produces HTML output
+  
+  The template expects the following context variables:
+  - dag_data: Dictionary containing DAG metadata
+  - value: Formatted string representation of the node's value
+  - argv_elements: List of argument details for argv nodes (optional)
+  - script: Python script content (optional)
+  - stack_trace: Error stack trace (optional)
+  - html_uri: Pre-signed URL for HTML content (optional)
+#}
+
 {% extends "layout.html" %}
 
 {% block extra_header %}
@@ -6,6 +26,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
   
   <style>
+    /* Code container styling for syntax-highlighted content */
     .code-container {
       max-height: 70vh;
       overflow-y: auto;
@@ -18,10 +39,12 @@
       background-color: var(--bs-gray-100);
     }
     
+    /* Node information table styling */
     .node-info-table {
       margin-bottom: 0;
     }
     
+    /* Argument cards styling with hover effects */
     .argv-card {
       transition: all 0.2s ease;
     }
@@ -31,11 +54,13 @@
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
     
+    /* Argument index badge styling */
     .argv-index {
       font-weight: bold;
       color: var(--bs-primary);
     }
     
+    /* Argument value display with monospace font and proper wrapping */
     .argv-value {
       font-family: var(--bs-font-monospace);
       background-color: var(--bs-gray-100);
@@ -45,6 +70,7 @@
       word-break: break-all;
     }
     
+    /* Dark theme support for argument values */
     [data-bs-theme="dark"] .argv-value {
       background-color: var(--bs-gray-800);
     }
@@ -60,7 +86,16 @@
       <h2 class="mb-0">Node</h2>
     </div>
     
-    <!-- Tab Navigation -->
+    <!-- Tab Navigation
+         Displays tabs for different views of node data. Tabs are conditionally shown
+         based on available data:
+         - Info: Always shown, contains basic node metadata
+         - Data: Always shown, contains the node's computed value
+         - Arguments: Shown only for argv nodes with argument data
+         - Code: Shown only if script content is available
+         - Stacktrace: Shown only if error occurred
+         - HTML: Shown only if node produces HTML output
+    -->
     <ul class="nav nav-tabs" id="nodeTab" role="tablist">
       <li class="nav-item" role="presentation">
         <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab" aria-controls="info" aria-selected="true">Info</button>
@@ -133,7 +168,12 @@
         </div>
       </div>
       
-      <!-- Arguments Tab -->
+      <!-- Arguments Tab
+           Displays command-line arguments for argv nodes as individual cards.
+           Each card shows the argument's index, type, and formatted value.
+           Content is populated dynamically by JavaScript using data from #argv-data script tag.
+           The tab is hidden by default and shown only when argv data is available.
+      -->
       <div class="tab-pane fade" id="argv" role="tabpanel" aria-labelledby="argv-tab">
         <div class="container-fluid">
           <div class="card">
@@ -217,7 +257,12 @@
   {% endif %}
   
   <script>
-    // Helper function to escape HTML
+    /**
+     * Escapes HTML characters to prevent XSS and ensure proper display.
+     * 
+     * @param {string|null|undefined} text - The text to escape
+     * @returns {string} HTML-escaped text or empty string if input is null/undefined
+     */
     function escapeHtml(text) {
       if (text === null || text === undefined) return '';
       const div = document.createElement('div');
@@ -225,7 +270,23 @@
       return div.innerHTML;
     }
 
-    // Function to populate argv tab with individual argument cards
+    /**
+     * Populates the arguments tab with individual argument cards.
+     * 
+     * This function reads argv data from a JSON script tag and creates Bootstrap cards
+     * for each command-line argument. Each card displays the argument's index, type,
+     * and formatted value. The argv tab is only shown if argument data is available.
+     * 
+     * Expected JSON structure in #argv-data script tag:
+     * [
+     *   {
+     *     "index": 0,
+     *     "value": "formatted argument value",
+     *     "type": "str"
+     *   },
+     *   ...
+     * ]
+     */
     function populateNodeArgvTab() {
       const argvContent = document.getElementById('argvContent');
       const argvTabContainer = document.getElementById('argv-tab-container');

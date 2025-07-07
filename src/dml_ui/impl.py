@@ -503,12 +503,13 @@ def api_dag_data():
         log_streams = data.pop("log_streams", {})
         dag_data = data.pop("dag_data")
         
-        # Get argv data if available and add links to nodes
+        # Process argv data for frontend display
+        # Convert argv node IDs to node objects with navigation links
         argv_data = []
         if dag_data.get("argv"):
             try:
                 argv_node_ids = dag_data["argv"]
-                # Handle both string (single node) and list (multiple nodes) cases
+                # Normalize argv_node_ids to always be a list for consistent processing
                 if isinstance(argv_node_ids, str):
                     argv_node_ids = [argv_node_ids]
                 elif isinstance(argv_node_ids, list):
@@ -517,6 +518,7 @@ def api_dag_data():
                     print(f"DEBUG: Unexpected argv type: {type(argv_node_ids)}")
                     argv_node_ids = []
                 
+                # Create navigation links for each argv node
                 for node_id in argv_node_ids:
                     # Find the corresponding node in the dag_data
                     node_info = next((node for node in dag_data["nodes"] if node["id"] == node_id), None)

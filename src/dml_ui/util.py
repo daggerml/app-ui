@@ -1,3 +1,19 @@
+"""
+DaggerML UI Utility Functions
+
+This module provides utility functions for processing and formatting DAG data
+for display in the web interface. Key functionality includes:
+
+- Node filtering and pruning for cleaner visualization
+- Resource resolution and substitution handling  
+- Node representation extraction including error traces, scripts, and HTML content
+- Special handling for command-line argument (argv) nodes
+- DAG information aggregation for comprehensive UI display
+
+The functions in this module bridge between the DaggerML core data structures
+and the frontend UI components, handling data transformation and formatting.
+"""
+
 import logging
 import re
 from pprint import pformat
@@ -11,7 +27,22 @@ logger = logging.getLogger(__name__)
 
 
 def filter_nodes(nodes, edges):
-    """Filter out nodes that are dml created and can be pruned
+    """Filter out nodes that are dml created and can be pruned.
+
+    This function removes internal DML nodes from the visualization to show only
+    user-relevant nodes and their connections.
+
+    Parameters
+    ----------
+    nodes : list of dict
+        List of node dictionaries containing node metadata including 'node_type' and 'id'.
+    edges : list of dict
+        List of edge dictionaries containing 'source' and 'target' node IDs.
+
+    Returns
+    -------
+    tuple of (list, list)
+        A tuple containing (filtered_nodes, filtered_edges) with DML internal nodes removed.
 
     Examples
     --------
@@ -38,12 +69,54 @@ def filter_nodes(nodes, edges):
 
 
 def get_sub(resource):
+    """Recursively resolve resource substitutions to get the final resource.
+
+    Parameters
+    ----------
+    resource : Resource
+        A DaggerML Resource object that may contain substitutions.
+
+    Returns
+    -------
+    Resource
+        The final resolved resource after following all substitution chains.
+    """
     while (sub := (resource.data or {}).get("sub")) is not None:
         resource = sub
     return resource
 
 
 def get_node_repr(dag, node_id):
+    """Get a comprehensive representation of a DAG node for display in the UI.
+
+    This function extracts various metadata about a node including its value, error traces,
+    associated scripts, HTML content, and command-line arguments if applicable.
+
+    Parameters
+    ----------
+    dag : DAG
+        The DaggerML DAG object containing the node.
+    node_id : str
+        The unique identifier of the node to represent.
+
+    Returns
+    -------
+    dict
+        A dictionary containing:
+        - script : str or None
+            Associated script content if the node represents a script execution.
+        - html_uri : str or None
+            Pre-signed S3 URL for HTML content if the node contains HTML output.
+        - stack_trace : str or None
+            Formatted stack trace if the node contains an error.
+        - value : str
+            Pretty-formatted string representation of the node's value.
+        - argv_elements : list or None
+            List of dictionaries containing argument details if this is an argv-like node.
+            Each element contains 'index', 'value', and 'type' keys.
+        - node_type : str or None
+            Type classification of the node (e.g., 'argv' for argument nodes).
+    """
     val = dag[node_id].value()
     stack_trace = html_uri = script = None
     if isinstance(val, Error):
@@ -70,6 +143,7 @@ def get_node_repr(dag, node_id):
             )
     
     # Check if this is an argv node and parse the arguments
+    # Argv nodes typically contain lists of basic Python types (strings, numbers, etc.)
     argv_elements = []
     if isinstance(val, list) and len(val) > 0:
         # Check if this looks like command line arguments
@@ -86,6 +160,33 @@ def get_node_repr(dag, node_id):
 
 
 def get_dag_info(dml, dag_id, prune=False):
+    """Retrieve comprehensive information about a DAG for display in the UI.
+
+    This function gathers all necessary data about a DAG including its structure,
+    nodes, edges, environment information, and log streams.
+
+    Parameters
+    ----------
+    dml : DML
+        The DaggerML client object.
+    dag_id : str
+        The unique identifier of the DAG.
+    prune : bool, optional
+        Whether to prune internal DML nodes from the result (default: False).
+
+    Returns
+    -------
+    dict
+        A dictionary containing:
+        - dag_data : dict
+            Core DAG structure including nodes and edges.
+        - script : str or None
+            Script content associated with the DAG's argv if available.
+        - result : various types or None
+            The DAG's result value if it has been computed.
+        - log_streams : dict
+            Dictionary containing log stream information with 'stdout' and 'stderr' keys.
+    """
     out = {"dag_data": dml("dag", "describe", dag_id)}
     dag_data = out["dag_data"]
     for node in dag_data["nodes"]:
@@ -99,10 +200,13 @@ def get_dag_info(dml, dag_id, prune=False):
         node = dml.get_node_value(Ref(dag_data["argv"]))
         out["script"] = (get_sub(node[0]).data or {}).get("script")
     dag = dml.load(dag_id)
+    
+    # Process DAG result node if available
+    # Extract the actual result value, excluding argv_elements from the unpacking
     for key in ["result"]:
         if dag_data.get(key) is not None:
             tmp = get_node_repr(dag, dag_data[key])
-            out[key] = tmp
+            out[key], = [v for k, v in tmp.items() if v is not None and k != "argv_elements"]
     try:
         env_data, = [dag[node["id"]].value() for node in dag_data["nodes"] if node["name"] == ".dml/env"]
         log_group = env_data["log_group"]
@@ -114,4 +218,23 @@ def get_dag_info(dml, dag_id, prune=False):
 
 
 def get_node_info(dml, dag_id, node_id):
+    """Retrieve detailed information about a specific node in a DAG.
+
+    This is a convenience wrapper around get_node_repr that loads the DAG
+    and extracts information for a single node.
+
+    Parameters
+    ----------
+    dml : DML
+        The DaggerML client object.
+    dag_id : str
+        The unique identifier of the DAG containing the node.
+    node_id : str
+        The unique identifier of the node to retrieve information for.
+
+    Returns
+    -------
+    dict
+        Node representation dictionary as returned by get_node_repr().
+    """
     return get_node_repr(dml.load(dag_id), node_id)
