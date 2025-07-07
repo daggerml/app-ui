@@ -33,7 +33,7 @@ class DashboardPlugin:
         obj: The object to render (e.g., Dag or Node)
         """
         page = "dag_route" if isinstance(obj, Dag) else "node_route"
-        return url_for(page, obj_id=obj.id)
+        return url_for(page, obj_id=obj.to)
 
 
 def discover_plugins():

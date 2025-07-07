@@ -14,37 +14,28 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
-def get_dropdowns(dml, repo, branch, dag_id):
-    dropdowns = {"repos": {x["name"]: url_for("main", repo=x["name"]) for x in dml("repo", "list")}}
-    if repo is not None:
-        dropdowns["branches"] = {x: url_for("main", repo=repo, branch=x) for x in dml("branch", "list")}
-    if branch is not None:
-        tmp = {x["name"]: x["id"] for x in dml("dag", "list")}
-        dropdowns["dags"] = {k: url_for("dag_route", repo=repo, branch=branch, dag_id=v) for k, v in tmp.items()}
-    return dropdowns
-
-def get_breadcrumbs(dml, repo, branch, dag_id, dag_data=None):
+def get_breadcrumbs(repo, branch, dag_id, dag_data=None):
     """Generate breadcrumb navigation data"""
     breadcrumbs = []
     # Home breadcrumb
     breadcrumbs.append({
-        'name': 'Home',
-        'url': url_for('main'),
-        'icon': 'bi-house'
+        "name": "Home",
+        "url": url_for("main"),
+        "icon": "bi-house"
     })
     if repo:
         # Repo breadcrumb
         breadcrumbs.append({
-            'name': repo,
-            'url': url_for('main', repo=repo),
-            'icon': 'bi-folder'
+            "name": repo,
+            "url": url_for("main", repo=repo),
+            "icon": "bi-folder"
         })
         if branch:
             # Branch breadcrumb
             breadcrumbs.append({
-                'name': branch,
-                'url': url_for('main', repo=repo, branch=branch),
-                'icon': 'bi-git'
+                "name": branch,
+                "url": url_for("main", repo=repo, branch=branch),
+                "icon": "bi-git"
             })
             if dag_id and dag_data:
                 breadcrumbs.append({
@@ -139,30 +130,24 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
     return sidebar
 
 
-cloudwatch_logs = CloudWatchLogs()
-
 @app.route("/dag")
 def dag_route():
     repo = request.args.get("repo")
     branch = request.args.get("branch")
     dag_id = request.args.get("dag_id")
-    
     if not dag_id:
         return "DAG ID is required", 400
-    
     dml = Dml(repo=repo, branch=branch)
-    
-    # Generate breadcrumbs and sidebar data (these are needed for navigation)
-    breadcrumbs = get_breadcrumbs(dml, repo, branch, dag_id, None)
+    breadcrumbs = get_breadcrumbs(repo, branch, dag_id, None)
     sidebar = get_sidebar_data(dml, repo, branch, dag_id, None)
-    
-    # Pass minimal data to template - everything else will be loaded dynamically
-    return render_template("dag.html", 
-                         repo=repo, 
-                         branch=branch, 
-                         dag_id=dag_id,
-                         breadcrumbs=breadcrumbs, 
-                         sidebar=sidebar)
+    return render_template(
+        "dag.html",
+        repo=repo,
+        branch=branch,
+        dag_id=dag_id,
+        breadcrumbs=breadcrumbs,
+        sidebar=sidebar,
+    )
 
 @app.route("/node")
 def node_route():
@@ -171,18 +156,16 @@ def node_route():
     dag_id = request.args.get("dag_id")
     node_id = request.args.get("node_id")
     dml = Dml(repo=repo, branch=branch)
-    dropdowns = get_dropdowns(dml, repo, branch, dag_id)
     
     # Get DAG data for breadcrumbs and sidebar
     dag_info = get_dag_info(dml, dag_id)
     dag_data = dag_info.get("dag_data")
-    breadcrumbs = get_breadcrumbs(dml, repo, branch, dag_id, dag_data)
+    breadcrumbs = get_breadcrumbs(repo, branch, dag_id, dag_data)
     sidebar = get_sidebar_data(dml, repo, branch, dag_id, dag_data)
     
     data = get_node_info(dml, dag_id, node_id)
     return render_template(
         "node.html",
-        dropdowns=dropdowns,
         breadcrumbs=breadcrumbs,
         sidebar=sidebar,
         dag_id=dag_id,
@@ -196,10 +179,9 @@ def main():
     repo = request.args.get("repo")
     branch = request.args.get("branch")
     dml = Dml(repo=repo, branch=branch)
-    dropdowns = get_dropdowns(dml, repo, branch, None)
-    breadcrumbs = get_breadcrumbs(dml, repo, branch, None, None)
+    breadcrumbs = get_breadcrumbs(repo, branch, None, None)
     sidebar = get_sidebar_data(dml, repo, branch, None, None)
-    return render_template("index.html", dropdowns=dropdowns, breadcrumbs=breadcrumbs, sidebar=sidebar)
+    return render_template("index.html", breadcrumbs=breadcrumbs, sidebar=sidebar)
 
 @app.route("/logs", methods=["GET"])
 def get_logs():
@@ -230,6 +212,7 @@ def get_logs():
     log_group = stream_details["log_group"]
     log_stream = stream_details["log_stream"]
     # Get the logs from CloudWatch
+    cloudwatch_logs = CloudWatchLogs()
     logs = cloudwatch_logs.get_log_events(
         log_group_name=log_group,
         log_stream_name=log_stream,
@@ -437,29 +420,6 @@ def plugins(plugin_name):
     # Render plugin with new signature
     rendered_html = plugin().render(dml, dag, repo=repo, branch=branch, dag_id=dag_id)
     return render_template("plugin.html", plugin=plugin, rendered_html=rendered_html, dag=dag)
-
-@app.route("/idx")
-def idx():
-    repo = request.args.get("repo")
-    branch = request.args.get("branch")
-    dml = Dml(repo=repo, branch=branch)
-    dropdowns = get_dropdowns(dml, repo, branch, None)
-    breadcrumbs = get_breadcrumbs(dml, repo, branch, None, None)
-    sidebar = get_sidebar_data(dml, repo, branch, None, None)
-    return render_template("indexes.html", dropdowns=dropdowns, breadcrumbs=breadcrumbs, sidebar=sidebar)
-
-@app.route("/kill-indexes", methods=["POST"])
-def kill_idx():
-    repo = request.args.get("repo")
-    branch = request.args.get("branch")
-    dml = Dml(repo=repo, branch=branch)
-    body = request.form.getlist("del-idx", type=str)
-    for idx in body:
-        dml("index", "delete", idx)
-    idxs = dml("index", "list")
-    for idx in idxs:
-        idx["dag_link"] = url_for("dag_route", repo=repo, branch=branch, dag_id=idx["dag"])
-    return jsonify({"deleted": len(body), "indexes": idxs})
 
 
 @app.route("/api/dag", methods=["GET"])
