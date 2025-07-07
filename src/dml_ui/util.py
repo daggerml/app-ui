@@ -68,11 +68,20 @@ def get_node_repr(dag, node_id):
                 },
                 ExpiresIn=3600,  # URL expires in 1 hour
             )
+    
+    # Check if this is an argv node and parse the arguments
+    argv_elements = []
+    if isinstance(val, list) and len(val) > 0:
+        # Check if this looks like command line arguments
+        if all(isinstance(item, (str, int, float, bool)) for item in val):
+            argv_elements = val
+    
     return {
         "script": script,
         "html_uri": html_uri,
         "stack_trace": stack_trace,
         "value": pformat(val, depth=3),
+        "argv_elements": argv_elements,
     }
 
 
@@ -93,7 +102,7 @@ def get_dag_info(dml, dag_id, prune=False):
     for key in ["result"]:
         if dag_data.get(key) is not None:
             tmp = get_node_repr(dag, dag_data[key])
-            out[key], = [v for v in tmp.values() if v is not None]
+            out[key] = tmp
     try:
         env_data, = [dag[node["id"]].value() for node in dag_data["nodes"] if node["name"] == ".dml/env"]
         log_group = env_data["log_group"]
