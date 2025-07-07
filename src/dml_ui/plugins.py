@@ -1,51 +1,53 @@
 from flask import url_for
 import importlib.metadata
 
-from daggerml import Dag
+from daggerml.core import Dag, Node
 
 class DashboardPlugin:
     NAME = None
     DESCRIPTION = None
 
-    def render(self, dml, obj, **kwargs):
-        """
-        Return HTML (or Flask Response) to embed in the dashboard.
+    def __init__(self, dml):
+        self.dml = dml
 
-        Parameters
-        ----------
-        dml: The Dml instance for accessing the API
-        obj: The object to render (e.g., Dag or Node)
-        **kwargs: Additional context including:
-            - dag_id: The DAG identifier
-            - repo: Repository name
-            - branch: Branch name
-            - dag_object: The loaded DAG object from dml.load(dag_id) for value access
-        """
+    def render(self):
+        """Return HTML content for the dashboard."""
         raise NotImplementedError
 
-    def url_for(self, dml, obj):
+    def url_for(self, obj):
+        """Returns the URL for the provided DAG or Node object.
+        
+        Users can call this from within their `render` to get the URLs for other
+        DAGs and nodes in their dashboards.
         """
-        Generate the Url for a given dml object (e.g., Dag or Node).
+        if isinstance(obj, Dag):
+            return url_for("dag_route", dag_id=obj._ref.to)
+        if isinstance(obj, Node):
+            return url_for("node_route", dag_id=obj.dag._ref.to, node_id=obj.ref.to)
+        return "#"
 
-        Parameters
-        ----------
-        dml: The Dml instance for accessing the API
-        obj: The object to render (e.g., Dag or Node)
-        """
-        page = "dag_route" if isinstance(obj, Dag) else "node_route"
-        return url_for(page, obj_id=obj.to)
+class DagDashboardPlugin(DashboardPlugin):
+    def __init__(self, dml, dag):
+        super().__init__(dml)
+        self.dag = dag
+        self._current_dag_id = dag._ref.to if hasattr(dag, '_ref') else None
+
+class NodeDashboardPlugin(DashboardPlugin):
+    def __init__(self, dml, node):
+        super().__init__(dml)
+        self.node = node
 
 
-def discover_plugins():
-    """Discover all available dashboard plugins"""
+def discover_dag_plugins():
+    """Discover all available DAG dashboard plugins"""
     import logging
     logger = logging.getLogger(__name__)
     
     plugins = []
     seen_names = set()
     
-    # Add built-in plugins
-    built_in_plugins = [DAGInfoPlugin, SimpleStatsPlugin, DMLExplorerPlugin]
+    # Add built-in DAG plugins
+    built_in_plugins = [ExampleDagPlugin, DagStatsPlugin]
     
     for plugin_cls in built_in_plugins:
         try:
@@ -53,152 +55,111 @@ def discover_plugins():
                 plugins.append(plugin_cls)
                 seen_names.add(plugin_cls.NAME)
         except Exception as e:
-            logger.warning(f"Failed to load built-in plugin {plugin_cls.__name__}: {e}")
+            logger.warning(f"Failed to load built-in DAG plugin {plugin_cls.__name__}: {e}")
     
     # Then discover plugins from entry points
     try:
-        for entry_point in importlib.metadata.entry_points(group="dml_ui.dashboard_plugins"):
+        for entry_point in importlib.metadata.entry_points(group="dml_ui.dashboard.dag"):
             try:
                 plugin_cls = entry_point.load()
-                if (issubclass(plugin_cls, DashboardPlugin) and 
+                if (issubclass(plugin_cls, DagDashboardPlugin) and 
                     plugin_cls.NAME and 
                     plugin_cls.NAME not in seen_names):
                     plugins.append(plugin_cls)
                     seen_names.add(plugin_cls.NAME)
             except Exception as e:
-                logger.warning(f"Failed to load plugin from entry point {entry_point.name}: {e}")
+                logger.warning(f"Failed to load DAG plugin from entry point {entry_point.name}: {e}")
     except Exception as e:
         # Entry points might not be available in development
-        logger.debug(f"Entry points not available: {e}")
+        logger.debug(f"DAG plugin entry points not available: {e}")
     
     return plugins
 
-# Built-in plugins
-class DAGInfoPlugin(DashboardPlugin):
-    NAME = "DAG Info"
-    DESCRIPTION = "Shows basic information about the DAG"
+def discover_node_plugins():
+    """Discover all available Node dashboard plugins"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    plugins = []
+    seen_names = set()
+    
+    # Add built-in Node plugins
+    built_in_plugins = [ExampleNodePlugin, NodeDetailsPlugin]
+    
+    for plugin_cls in built_in_plugins:
+        try:
+            if plugin_cls.NAME and plugin_cls.NAME not in seen_names:
+                plugins.append(plugin_cls)
+                seen_names.add(plugin_cls.NAME)
+        except Exception as e:
+            logger.warning(f"Failed to load built-in Node plugin {plugin_cls.__name__}: {e}")
+    
+    # Then discover plugins from entry points
+    try:
+        for entry_point in importlib.metadata.entry_points(group="dml_ui.dashboard.node"):
+            try:
+                plugin_cls = entry_point.load()
+                if (issubclass(plugin_cls, NodeDashboardPlugin) and 
+                    plugin_cls.NAME and 
+                    plugin_cls.NAME not in seen_names):
+                    plugins.append(plugin_cls)
+                    seen_names.add(plugin_cls.NAME)
+            except Exception as e:
+                logger.warning(f"Failed to load Node plugin from entry point {entry_point.name}: {e}")
+    except Exception as e:
+        # Entry points might not be available in development
+        logger.debug(f"Node plugin entry points not available: {e}")
+    
+    return plugins
 
-    def render(self, dml, dag, **kwargs):
-        # Extract nodes and edges from the raw dag object
-        nodes = dag.get("nodes", [])
-        edges = dag.get("edges", [])
-        
-        node_types = {}
-        for node in nodes:
-            node_type = node.get("node_type", "unknown")
-            node_types[node_type] = node_types.get(node_type, 0) + 1
-        
-        html = f"""
-        <div class="container-fluid">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>DAG Overview</h5>
-                        </div>
-                        <div class="card-body">
-                            <p><strong>Total Nodes:</strong> {len(nodes)}</p>
-                            <p><strong>Total Edges:</strong> {len(edges)}</p>
-                            <p><strong>DAG ID:</strong> {kwargs.get('dag_id', 'N/A')}</p>
-                            <p><strong>Repository:</strong> {kwargs.get('repo', 'N/A')}</p>
-                            <p><strong>Branch:</strong> {kwargs.get('branch', 'N/A')}</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Node Types</h5>
-                        </div>
-                        <div class="card-body">
-        """
-        
-        for node_type, count in node_types.items():
-            html += f"<p><strong>{node_type}:</strong> {count}</p>"
-        
-        html += """
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
-        
-        return html
 
-class SimpleStatsPlugin(DashboardPlugin):
-    NAME = "Simple Stats"
-    DESCRIPTION = "Shows basic DAG statistics without external dependencies"
 
-    def render(self, dml, dag, **kwargs):
-        # Extract nodes and edges from the raw dag object
-        nodes = dag.get("nodes", [])
-        edges = dag.get("edges", [])
+
+# DAG Dashboard Plugins
+class ExampleDagPlugin(DagDashboardPlugin):
+    NAME = "Example DAG Dashboard"
+    DESCRIPTION = "An example DAG dashboard showing DAG-level information"
+
+    def render(self):
+        dag_id = self.dag._ref.to if hasattr(self.dag, '_ref') else 'Unknown'
         
-        node_types = {}
-        for node in nodes:
-            node_type = node.get("node_type", "unknown")
-            node_types[node_type] = node_types.get(node_type, 0) + 1
-        
-        # Create a simple bar chart using CSS
-        max_count = max(node_types.values()) if node_types else 1
+        # Get DAG information
+        dag_nodes = []
+        try:
+            # Access dag nodes through the dag object
+            dag_data = self.dml("dag", "describe", dag_id)
+            dag_nodes = dag_data.get("nodes", [])
+        except Exception:
+            pass
         
         html = f"""
         <div class="container-fluid">
             <div class="row">
                 <div class="col-12">
                     <div class="card">
-                        <div class="card-header">
-                            <h5>DAG Statistics</h5>
+                        <div class="card-header bg-primary text-white">
+                            <h5><i class="bi bi-diagram-3"></i> DAG Dashboard Example</h5>
                         </div>
                         <div class="card-body">
-                            <div class="row mb-4">
-                                <div class="col-md-4">
-                                    <div class="text-center">
-                                        <h2 class="text-primary">{len(nodes)}</h2>
-                                        <p class="text-muted">Total Nodes</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>DAG Information</h6>
+                                    <table class="table table-sm">
+                                        <tr><td><strong>DAG ID:</strong></td><td>{dag_id}</td></tr>
+                                        <tr><td><strong>Node Count:</strong></td><td>{len(dag_nodes)}</td></tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>DAG Actions</h6>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-primary btn-sm" onclick="alert('DAG action executed!')">
+                                            <i class="bi bi-play"></i> Execute DAG
+                                        </button>
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="alert('DAG exported!')">
+                                            <i class="bi bi-download"></i> Export DAG
+                                        </button>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="text-center">
-                                        <h2 class="text-success">{len(edges)}</h2>
-                                        <p class="text-muted">Total Edges</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="text-center">
-                                        <h2 class="text-info">{len(node_types)}</h2>
-                                        <p class="text-muted">Node Types</p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <h6>Node Type Distribution:</h6>
-                            <div class="mt-3">
-        """
-        
-        colors = ["#0d6efd", "#198754", "#ffc107", "#dc3545", "#6f42c1", "#fd7e14"]
-        
-        for i, (node_type, count) in enumerate(node_types.items()):
-            percentage = (count / max_count) * 100
-            color = colors[i % len(colors)]
-            
-            html += f"""
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between">
-                        <span><strong>{node_type}</strong></span>
-                        <span>{count}</span>
-                    </div>
-                    <div class="progress" style="height: 20px;">
-                        <div class="progress-bar" role="progressbar" 
-                             style="width: {percentage}%; background-color: {color};"
-                             aria-valuenow="{count}" aria-valuemin="0" aria-valuemax="{max_count}">
-                        </div>
-                    </div>
-                </div>
-            """
-        
-        html += """
                             </div>
                         </div>
                     </div>
@@ -209,199 +170,238 @@ class SimpleStatsPlugin(DashboardPlugin):
         
         return html
 
-class DMLExplorerPlugin(DashboardPlugin):
-    NAME = "DML Explorer"
-    DESCRIPTION = "Interactive explorer with direct DML API access"
+class DagStatsPlugin(DagDashboardPlugin):
+    NAME = "DAG Statistics"
+    DESCRIPTION = "Shows detailed statistics about the DAG structure"
 
-    def render(self, dml, dag, **kwargs):
+    def render(self):
+        dag_id = self.dag._ref.to if hasattr(self.dag, '_ref') else 'Unknown'
+        
         try:
-            dag_id = kwargs.get('dag_id', 'Unknown')
+            dag_data = self.dml("dag", "describe", dag_id)
+            nodes = dag_data.get("nodes", [])
+            edges = dag_data.get("edges", [])
             
-            # Initialize default values
-            repo_count = 0
-            branches = []
-            dag_count = 0
-            error_messages = []
+            # Analyze node types
+            node_types = {}
+            for node in nodes:
+                node_type = node.get("node_type", "unknown")
+                node_types[node_type] = node_types.get(node_type, 0) + 1
             
-            # Safely access DML API with individual try-catch blocks
-            try:
-                repos = dml("repo", "list")
-                repo_count = len(repos) if repos else 0
-            except Exception as e:
-                error_messages.append(f"Failed to get repositories: {str(e)}")
-                repo_count = 0
+            # Create statistics
+            stats_html = ""
+            for node_type, count in node_types.items():
+                percentage = (count / len(nodes)) * 100 if nodes else 0
+                stats_html += f"""
+                <div class="row mb-2">
+                    <div class="col-4"><strong>{node_type.title()}:</strong></div>
+                    <div class="col-4">{count}</div>
+                    <div class="col-4">
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar" role="progressbar" style="width: {percentage}%">
+                                {percentage:.1f}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                """
             
-            # Get branch information if repo is available
-            repo_name = kwargs.get('repo')
-            if repo_name:
-                try:
-                    branches = dml("branch", "list", repo_name)
-                    if not isinstance(branches, list):
-                        branches = []
-                except Exception as e:
-                    error_messages.append(f"Failed to get branches: {str(e)}")
-                    branches = []
-            
-            # Get DAG list safely
-            try:
-                dags = dml("dag", "list")
-                dag_count = len(dags) if dags else 0
-            except Exception as e:
-                error_messages.append(f"Failed to get DAG list: {str(e)}")
-                dag_count = 0
-            
-            # Extract detailed node information safely
-            nodes = dag.get("nodes", []) if isinstance(dag, dict) else []
-            edges = dag.get("edges", []) if isinstance(dag, dict) else []
-            
-            # Find function nodes with additional details
-            function_nodes = []
-            try:
-                function_nodes = [node for node in nodes if isinstance(node, dict) and node.get("node_type") == "fn"]
-            except Exception as e:
-                error_messages.append(f"Failed to process function nodes: {str(e)}")
-                function_nodes = []
-            
-            # Build the HTML response
-            html = """
+            html = f"""
             <div class="container-fluid">
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="alert alert-info">
-                            <h5><i class="bi bi-info-circle"></i> DML API Explorer</h5>
-                            <p>This plugin demonstrates direct access to the DML API and raw DAG data.</p>
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5><i class="bi bi-bar-chart"></i> DAG Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-center">
+                                <h2 class="text-primary">{len(nodes)}</h2>
+                                <p class="text-muted">Total Nodes</p>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <h2 class="text-success">{len(edges)}</h2>
+                                <p class="text-muted">Total Edges</p>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <h2 class="text-warning">{len(node_types)}</h2>
+                                <p class="text-muted">Node Types</p>
+                            </div>
                         </div>
+                        <h6>Node Type Distribution:</h6>
+                        {stats_html}
                     </div>
                 </div>
+            </div>
             """
             
-            # Show error messages if any
-            if error_messages:
-                html += """
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="alert alert-warning">
-                            <h6>API Warnings:</h6>
-                            <ul class="mb-0">
-                """
-                for msg in error_messages:
-                    html += f"<li>{msg}</li>"
-                html += """
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                """
-            
-            html += f"""
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h3 class="text-primary">{repo_count}</h3>
-                                <p class="text-muted">Repositories</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h3 class="text-success">{len(branches)}</h3>
-                                <p class="text-muted">Branches</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h3 class="text-warning">{dag_count}</h3>
-                                <p class="text-muted">Total DAGs</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h3 class="text-info">{len(function_nodes)}</h3>
-                                <p class="text-muted">Functions</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Current DAG: {dag_id}</h5>
-                            </div>
-                            <div class="card-body">
-                                <p><strong>Nodes:</strong> {len(nodes)}</p>
-                                <p><strong>Edges:</strong> {len(edges)}</p>
-                                <p><strong>Repository:</strong> {kwargs.get('repo', 'N/A')}</p>
-                                <p><strong>Branch:</strong> {kwargs.get('branch', 'N/A')}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Function Nodes</h5>
-                            </div>
-                            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+        except Exception as e:
+            html = f"""
+            <div class="alert alert-danger">
+                <h5>Error loading DAG statistics</h5>
+                <p>{str(e)}</p>
+            </div>
             """
+        
+        return html
+
+# Node Dashboard Plugins
+class ExampleNodePlugin(NodeDashboardPlugin):
+    NAME = "Example Node Dashboard"
+    DESCRIPTION = "An example node dashboard showing node-level information"
+
+    def render(self):
+        node_id = self.node.ref.to if hasattr(self.node, 'ref') else 'Unknown'
+        
+        # Get node value safely
+        node_value = "N/A"
+        node_type = "Unknown"
+        try:
+            # Access the node's value
+            node_value = str(self.node.value())[:200] + ("..." if len(str(self.node.value())) > 200 else "")
             
-            if function_nodes:
-                for func_node in function_nodes[:10]:  # Show first 10
-                    try:
-                        name = func_node.get('name', 'Unnamed')
-                        node_id = str(func_node.get('id', 'Unknown'))[:8]
-                        doc = func_node.get('doc', 'No documentation')
-                        if len(doc) > 100:
-                            doc = doc[:100] + '...'
-                        html += f"""
-                        <div class="mb-2 p-2 border-start border-primary border-3">
-                            <strong>{name}</strong> <small class="text-muted">({node_id})</small><br>
-                            <small>{doc}</small>
+            # Get node metadata - we need the DAG ID for this
+            if hasattr(self, '_current_dag_id'):
+                dag_data = self.dml("dag", "describe", self._current_dag_id)
+                for n in dag_data.get("nodes", []):
+                    if n.get("id") == node_id:
+                        node_type = n.get("node_type", "Unknown")
+                        break
+        except Exception as e:
+            node_value = f"Error loading value: {str(e)}"
+        
+        html = f"""
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5><i class="bi bi-node-plus"></i> Node Dashboard Example</h5>
                         </div>
-                        """
-                    except Exception as e:
-                        html += f"""
-                        <div class="mb-2 p-2 border-start border-danger border-3">
-                            <small class="text-danger">Error processing function node: {str(e)}</small>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Node Information</h6>
+                                    <table class="table table-sm">
+                                        <tr><td><strong>Node ID:</strong></td><td><code>{node_id}</code></td></tr>
+                                        <tr><td><strong>Node Type:</strong></td><td><span class="badge bg-secondary">{node_type}</span></td></tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Node Actions</h6>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-success btn-sm" onclick="alert('Node executed!')">
+                                            <i class="bi bi-play-circle"></i> Execute Node
+                                        </button>
+                                        <button class="btn btn-outline-info btn-sm" onclick="alert('Node inspected!')">
+                                            <i class="bi bi-search"></i> Inspect Node
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <h6>Node Value Preview</h6>
+                                    <pre class="bg-light p-2 rounded" style="max-height: 200px; overflow-y: auto;">{node_value}</pre>
+                                </div>
+                            </div>
                         </div>
-                        """
-                if len(function_nodes) > 10:
-                    html += f"<p class='text-muted'>... and {len(function_nodes) - 10} more functions</p>"
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        
+        return html
+
+class NodeDetailsPlugin(NodeDashboardPlugin):
+    NAME = "Node Details"
+    DESCRIPTION = "Shows detailed information about a node including dependencies"
+
+    def render(self):
+        node_id = self.node.ref.to if hasattr(self.node, 'ref') else 'Unknown'
+        
+        try:
+            # We need the DAG ID to get detailed information
+            if not hasattr(self, '_current_dag_id'):
+                return """
+                <div class="alert alert-warning">
+                    <h5>DAG context required</h5>
+                    <p>Cannot determine DAG context for detailed node information.</p>
+                </div>
+                """
+            
+            dag_data = self.dml("dag", "describe", self._current_dag_id)
+            nodes = dag_data.get("nodes", [])
+            edges = dag_data.get("edges", [])
+            
+            # Find current node
+            current_node = None
+            for n in nodes:
+                if n.get("id") == node_id:
+                    current_node = n
+                    break
+            
+            if not current_node:
+                return f"""
+                <div class="alert alert-warning">
+                    <h5>Node not found</h5>
+                    <p>Node {node_id} was not found in DAG {self._current_dag_id}</p>
+                </div>
+                """
+            
+            # Find dependencies (incoming edges)
+            dependencies = []
+            dependents = []
+            for edge in edges:
+                if edge.get("target") == node_id:
+                    dependencies.append(edge.get("source"))
+                elif edge.get("source") == node_id:
+                    dependents.append(edge.get("target"))
+            
+            dep_html = ""
+            if dependencies:
+                dep_html = "<ul>" + "".join([f"<li><code>{dep}</code></li>" for dep in dependencies]) + "</ul>"
             else:
-                html += "<p class='text-muted'>No function nodes found in this DAG.</p>"
+                dep_html = "<p class='text-muted'>No dependencies</p>"
             
-            html += """
+            dependent_html = ""
+            if dependents:
+                dependent_html = "<ul>" + "".join([f"<li><code>{dep}</code></li>" for dep in dependents]) + "</ul>"
+            else:
+                dependent_html = "<p class='text-muted'>No dependents</p>"
+            
+            html = f"""
+            <div class="container-fluid">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5><i class="bi bi-info-circle"></i> Node Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6>Node Properties</h6>
+                                <table class="table table-sm">
+                                    <tr><td><strong>ID:</strong></td><td><code>{current_node.get('id', 'N/A')}</code></td></tr>
+                                    <tr><td><strong>Name:</strong></td><td>{current_node.get('name', 'N/A')}</td></tr>
+                                    <tr><td><strong>Type:</strong></td><td><span class="badge bg-primary">{current_node.get('node_type', 'N/A')}</span></td></tr>
+                                    <tr><td><strong>Data Type:</strong></td><td>{current_node.get('data_type', 'N/A')}</td></tr>
+                                </table>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Dependencies ({len(dependencies)})</h6>
+                                {dep_html}
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Dependents ({len(dependents)})</h6>
+                                {dependent_html}
                             </div>
                         </div>
-                    </div>
-                </div>
-                
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Raw DAG Structure (First 10 Nodes)</h5>
-                            </div>
-                            <div class="card-body">
-                                <pre style="max-height: 400px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
-            """
-            
-            # Show first 10 nodes in a readable format
-            try:
-                import json
-                sample_nodes = nodes[:10] if nodes else []
-                html += json.dumps(sample_nodes, indent=2, default=str)
-            except Exception as e:
-                html += f"Error formatting DAG data: {str(e)}"
-            
-            html += """
-                                </pre>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <h6>Documentation</h6>
+                                <div class="bg-light p-2 rounded">
+                                    {current_node.get('doc', 'No documentation available') or 'No documentation available'}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -410,15 +410,12 @@ class DMLExplorerPlugin(DashboardPlugin):
             """
             
         except Exception as e:
-            # Catch-all exception handler for any unexpected errors
             html = f"""
-            <div class="container-fluid">
-                <div class="alert alert-danger">
-                    <h4><i class="bi bi-exclamation-triangle"></i> Plugin Error</h4>
-                    <p>An unexpected error occurred in the DML Explorer plugin:</p>
-                    <pre class="mt-2">{str(e)}</pre>
-                </div>
+            <div class="alert alert-danger">
+                <h5>Error loading node details</h5>
+                <p>{str(e)}</p>
             </div>
             """
         
         return html
+

@@ -138,4 +138,30 @@ def get_dag_info(dml, dag_id, prune=False):
 
 def get_node_info(dml, dag_id, node_id):
     """Retrieve detailed information about a specific node in a DAG."""
-    return get_node_repr(dml.load(dag_id), node_id)
+    node_data = get_node_repr(dml.load(dag_id), node_id)
+    try:
+        node_description = dml("node", "describe", node_id)
+        if node_description and "argv" in node_description:
+            argv_elements = []
+            for i, arg in enumerate(node_description["argv"] or []):
+                argv_elements.append({
+                    "index": i,
+                    "data_type": arg.get("data_type"),
+                    "doc": arg.get("doc"),
+                    "id": arg.get("id"),
+                    "dict_keys": arg.get("keys"),
+                    "length": arg.get("length"),
+                    "node_type": arg.get("node_type"),
+                })
+            node_data["argv_elements"] = argv_elements
+            node_data["has_argv"] = len(argv_elements) > 0
+        
+        # Add the full node description for plugins or other uses
+        node_data["node_description"] = node_description
+        
+    except Exception as e:
+        logger.warning(f"Failed to get node description for {node_id}: {e}")
+        # Fall back to the existing argv detection logic in get_node_repr
+        pass
+    
+    return node_data

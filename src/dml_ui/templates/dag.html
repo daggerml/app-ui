@@ -8,7 +8,7 @@
   - Graph: Interactive network visualization of nodes and edges
   - Result: Display of DAG execution results
   - Logs: Stdout/stderr output from DAG execution
-  - Arguments: Command-line arguments passed to the DAG
+  - argv: Command-line arguments passed to the DAG
   
   The template expects the following context variables:
   - dag_data: Dictionary containing nodes, edges, and metadata
@@ -349,7 +349,7 @@
       <button class="nav-link" id="table-tab" data-bs-toggle="tab" data-bs-target="#table" type="button" role="tab" aria-controls="table" aria-selected="false">Node Table</button>
     </li>
     <li class="nav-item" role="presentation" id="argv-tab-container" style="display: none;">
-      <button class="nav-link" id="argv-tab" data-bs-toggle="tab" data-bs-target="#argv" type="button" role="tab" aria-controls="argv" aria-selected="false">Arguments</button>
+      <button class="nav-link" id="argv-tab" data-bs-toggle="tab" data-bs-target="#argv" type="button" role="tab" aria-controls="argv" aria-selected="false">argv</button>
     </li>
     <li class="nav-item" role="presentation" id="code-tab-container" style="display: none;">
       <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code" type="button" role="tab" aria-controls="code" aria-selected="false">Executed Code</button>
@@ -423,9 +423,9 @@
           <div class="card-header">
             <h5 class="card-title mb-0">
               <i class="bi bi-list-ul me-2"></i>
-              Arguments
+              argv
             </h5>
-            <p class="text-muted mb-0 small">Node arguments passed to this DAG</p>
+            <p class="text-muted mb-0 small">Individual argv nodes in this DAG</p>
           </div>
           <div class="card-body" id="argvContent">
             <div class="text-center p-4">
@@ -992,67 +992,71 @@
       argvContent.innerHTML = `
         <div class="text-center p-4 text-muted">
           <i class="bi bi-info-circle fs-3"></i>
-          <p class="mt-2">No arguments found for this DAG</p>
+          <p class="mt-2">No argv found for this DAG</p>
         </div>
       `;
       return;
     }
     
-    // Create a grid of cards for each argv node
-    const argvCards = argvData.map((node, index) => {
-      const dataTypeIcon = getDataTypeIcon(node.data_type);
-      const nodeTypeIcon = getNodeTypeIcon(node.node_type);
+    // Create a grid of cards for each argv node description
+    const argvCards = argvData.map((argvNode, index) => {
+      const dataTypeIcon = getDataTypeIcon(argvNode.data_type);
+      const nodeTypeIcon = getNodeTypeIcon(argvNode.node_type);
       
       return `
         <div class="col-md-6 col-lg-4 mb-3">
           <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <span class="badge bg-primary">${index + 1}</span>
+              <span class="badge bg-primary">argv[${index}]</span>
               <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-secondary">
-                  <i class="${nodeTypeIcon}"></i> ${node.node_type}
+                  <i class="${nodeTypeIcon}"></i> ${argvNode.node_type || 'unknown'}
                 </span>
-                ${node.data_type ? `<span class="badge bg-info">
-                  <i class="${dataTypeIcon}"></i> ${node.data_type}
+                ${argvNode.data_type ? `<span class="badge bg-info">
+                  <i class="${dataTypeIcon}"></i> ${argvNode.data_type}
                 </span>` : ''}
               </div>
             </div>
             <div class="card-body">
-              ${node.name ? `<h6 class="card-title">${escapeHtml(node.name)}</h6>` : ''}
+              ${argvNode.name ? `<h6 class="card-title">${escapeHtml(argvNode.name)}</h6>` : ''}
               
               <dl class="row small mb-2">
                 <dt class="col-sm-4">Node ID:</dt>
-                <dd class="col-sm-8"><code class="small">${node.id || 'N/A'}</code></dd>
+                <dd class="col-sm-8"><code class="small">${argvNode.id || 'N/A'}</code></dd>
                 
-                ${node.datum_id ? `
+                ${argvNode.datum_id ? `
                 <dt class="col-sm-4">Datum ID:</dt>
-                <dd class="col-sm-8"><code class="small">${node.datum_id}</code></dd>
+                <dd class="col-sm-8"><code class="small">${argvNode.datum_id}</code></dd>
                 ` : ''}
                 
-                ${node.length !== null && node.length !== undefined ? `
+                ${argvNode.length !== null && argvNode.length !== undefined ? `
                 <dt class="col-sm-4">Length:</dt>
-                <dd class="col-sm-8">${node.length}</dd>
+                <dd class="col-sm-8">${argvNode.length}</dd>
                 ` : ''}
                 
-                ${node.keys && node.keys.length > 0 ? `
+                ${argvNode.dict_keys && argvNode.dict_keys.length > 0 ? `
                 <dt class="col-sm-4">Keys:</dt>
                 <dd class="col-sm-8">
-                  ${node.keys.map(key => `<span class="badge bg-light text-dark me-1">${escapeHtml(key)}</span>`).join('')}
+                  ${argvNode.dict_keys.map(key => `<span class="badge bg-light text-dark me-1">${escapeHtml(key)}</span>`).join('')}
                 </dd>
                 ` : ''}
               </dl>
               
-              ${node.doc ? `
+              ${argvNode.doc ? `
               <div class="mb-2">
                 <small class="text-muted">Documentation:</small>
-                <p class="small">${escapeHtml(node.doc)}</p>
+                <p class="small">${escapeHtml(argvNode.doc)}</p>
               </div>
               ` : ''}
             </div>
             <div class="card-footer">
-              <a href="${node.link}" class="btn btn-sm btn-outline-primary">
+              ${argvNode.link ? `
+              <a href="${argvNode.link}" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-arrow-right-circle"></i> View Node
               </a>
+              ` : `
+              <span class="text-muted small">Node details not available</span>
+              `}
             </div>
           </div>
         </div>
@@ -1498,7 +1502,7 @@
       pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>';
       
       // Fetch available plugins from backend
-      fetch('/api/plugins')
+      fetch('/api/dag/plugins')
         .then(response => response.json())
         .then(plugins => {
           if (plugins && plugins.length > 0) {
@@ -1539,7 +1543,7 @@
       const branch = urlParams.get('branch');
       
       // Build plugin URL with all necessary parameters
-      let pluginUrl = `/api/plugins/${encodeURIComponent(pluginId)}?dag_id=${encodeURIComponent(dagId)}`;
+      let pluginUrl = `/api/dag/plugins/${encodeURIComponent(pluginId)}?dag_id=${encodeURIComponent(dagId)}`;
       if (repo) {
         pluginUrl += `&repo=${encodeURIComponent(repo)}`;
       }

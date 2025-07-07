@@ -7,7 +7,7 @@ from daggerml import Dml
 from flask import Flask, jsonify, render_template, request, url_for
 
 from dml_ui.cloudwatch import CloudWatchLogs
-from dml_ui.plugins import discover_plugins
+from dml_ui.plugins import discover_dag_plugins, discover_node_plugins
 from dml_ui.util import get_dag_info, get_node_info
 
 logger = logging.getLogger(__name__)
@@ -242,184 +242,7 @@ def reload_plugins():
             except Exception as e:
                 logger.warning(f"Failed to reload module {module_name}: {e}")
 
-@app.route("/api/plugins", methods=["GET"])
-def api_plugins():
-    """
-    API endpoint to list all available dashboard plugins.
-    Returns JSON array of plugin metadata.
-    """
-    try:
-        # Reload plugins to detect changes
-        reload_plugins()
-        
-        plugins_list = []
-        for plugin_cls in discover_plugins():
-            plugins_list.append({
-                "id": plugin_cls.NAME,
-                "name": plugin_cls.NAME,
-                "description": getattr(plugin_cls, 'DESCRIPTION', 'No description available')
-            })
-        
-        return jsonify(plugins_list)
-    except Exception as e:
-        logger.error(f"Error loading plugins: {e}")
-        return jsonify({"error": "Failed to load plugins"}), 500
-
-@app.route("/api/plugins/<string:plugin_id>", methods=["GET"])
-def api_plugin_content(plugin_id):
-    """
-    API endpoint to get plugin content for a specific plugin.
-    Returns HTML content that will be embedded in an iframe.
-    """
-    try:
-        # Reload plugins to detect changes
-        reload_plugins()
-        
-        # Find the plugin by ID
-        plugins = [x for x in discover_plugins() if x.NAME == plugin_id]
-        if not plugins:
-            return f"<div style='text-align: center; padding: 50px;'><h3>Plugin '{plugin_id}' not found</h3></div>", 404
-        
-        if len(plugins) > 1:
-            return f"<div style='text-align: center; padding: 50px;'><h3>Multiple plugins found with name '{plugin_id}'</h3></div>", 500
-        
-        plugin_cls = plugins[0]
-        
-        # Get DAG data
-        dag_id = request.args.get("dag_id")
-        if not dag_id:
-            return "<div style='text-align: center; padding: 50px;'><h3>No DAG ID provided</h3></div>", 400
-        
-        repo = request.args.get("repo")
-        branch = request.args.get("branch")
-        dml = Dml(repo=repo, branch=branch)
-        
-        # Use the same DAG retrieval logic as get_dag_info
-        # First get the DAG description for structure/metadata
-        dag_data = dml("dag", "describe", dag_id)
-        # Then load the actual DAG object for value access
-        dag = dml.load(dag_id)
-        
-        # Initialize and render the plugin with dml instance and loaded dag
-        plugin_instance = plugin_cls()
-        try:
-            rendered_content = plugin_instance.render(
-                dml, 
-                dag_data,  # Pass the described DAG structure (like in get_dag_info)
-                dag_id=dag_id,
-                repo=repo,
-                branch=branch,
-                dag_object=dag  # Also pass the loaded DAG object for value access if needed
-            )
-        except Exception as plugin_error:
-            logger.error(f"Plugin {plugin_id} failed to render: {plugin_error}")
-            rendered_content = f"""
-            <div class="alert alert-danger">
-                <h4><i class="bi bi-exclamation-triangle"></i> Plugin Error</h4>
-                <p><strong>Plugin:</strong> {plugin_cls.NAME}</p>
-                <p><strong>Error:</strong> {str(plugin_error)}</p>
-                <details class="mt-3">
-                    <summary>Technical Details</summary>
-                    <pre class="mt-2 p-2 bg-light"><code>{repr(plugin_error)}</code></pre>
-                </details>
-                <div class="mt-3">
-                    <small class="text-muted">
-                        This plugin may not be compatible with the current DAG structure or data format.
-                        Check the plugin implementation or try a different plugin.
-                    </small>
-                </div>
-            </div>
-            """
-        
-        # Wrap content in a complete HTML document for iframe
-        html_content = f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>{plugin_cls.NAME}</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-            <style>
-                body {{
-                    margin: 0;
-                    padding: 20px;
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                }}
-                .plugin-container {{
-                    max-width: 100%;
-                    overflow-x: auto;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="plugin-container">
-                {rendered_content}
-            </div>
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        </body>
-        </html>
-        """
-        
-        return html_content, 200, {'Content-Type': 'text/html'}
-        
-    except Exception as e:
-        logger.error(f"Error rendering plugin {plugin_id}: {e}", exc_info=True)
-        error_html = f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Plugin Error</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-        </head>
-        <body>
-            <div class="container mt-5">
-                <div class="alert alert-danger">
-                    <h4><i class="bi bi-exclamation-triangle"></i> Plugin System Error</h4>
-                    <p><strong>Plugin ID:</strong> {plugin_id}</p>
-                    <p><strong>Error:</strong> {str(e)}</p>
-                    <details class="mt-3">
-                        <summary>Technical Details</summary>
-                        <pre class="mt-2 p-2 bg-light"><code>{repr(e)}</code></pre>
-                    </details>
-                    <div class="mt-3">
-                        <small class="text-muted">
-                            This error occurred in the plugin system infrastructure. 
-                            Please check the server logs for more details.
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        return error_html, 500, {'Content-Type': 'text/html'}
-
-@app.route("/plugins/<string:plugin_name>")
-def plugins(plugin_name):
-    """
-    Legacy plugin endpoint - kept for backwards compatibility.
-    """
-    plugins = [x for x in discover_plugins() if x.NAME == plugin_name]
-    if not plugins:
-        return jsonify({"error": f"Plugin {plugin_name} not found"}), 404
-    if len(plugins) > 1:
-        return jsonify({"error": f"Multiple plugins found with name {plugin_name}"}), 500
-    plugin = plugins[0]
-    repo = request.args.get("repo")
-    branch = request.args.get("branch")
-    dml = Dml(repo=repo, branch=branch)
-    dag_id = request.args.get("dag_id")
-    
-    # Get raw DAG object instead of processed dag_data
-    dag = dml("dag", "get", dag_id)
-    
-    # Render plugin with new signature
-    rendered_html = plugin().render(dml, dag, repo=repo, branch=branch, dag_id=dag_id)
-    return render_template("plugin.html", plugin=plugin, rendered_html=rendered_html, dag=dag)
+# Legacy plugin endpoints removed - use /api/dag/plugins and /api/node/plugins instead
 
 
 @app.route("/api/dag", methods=["GET"])
@@ -445,7 +268,7 @@ def api_dag_data():
         dag_data = data.pop("dag_data")
         
         # Process argv data for frontend display
-        # Convert argv node IDs to node objects with navigation links
+        # Use the new argv structure from node descriptions
         argv_data = []
         if dag_data.get("argv"):
             try:
@@ -458,21 +281,41 @@ def api_dag_data():
                 else:
                     argv_node_ids = []
                 
-                # Create navigation links for each argv node
+                # For each argv node, get its description to extract argv node descriptions
                 for node_id in argv_node_ids:
-                    # Find the corresponding node in the dag_data
-                    node_info = next((node for node in dag_data["nodes"] if node["id"] == node_id), None)
-                    if node_info:
-                        # Add link for navigation
-                        node_with_link = node_info.copy()
-                        node_with_link["link"] = url_for(
-                            "node_route",
-                            repo=repo,
-                            branch=branch,
-                            dag_id=dag_id,
-                            node_id=node_id
-                        )
-                        argv_data.append(node_with_link)
+                    try:
+                        # Get node description with argv data
+                        node_description = dml("node", "describe", node_id)
+                        if node_description and "argv" in node_description:
+                            argv_list = node_description["argv"]
+                            if argv_list is not None and isinstance(argv_list, list):
+                                # Each item in argv_list is a dict describing an argv node
+                                for argv_node_desc in argv_list:
+                                    # Add navigation link to each argv node
+                                    argv_node_with_link = argv_node_desc.copy()
+                                    if "id" in argv_node_desc:
+                                        argv_node_with_link["link"] = url_for(
+                                            "node_route",
+                                            repo=repo,
+                                            branch=branch,
+                                            dag_id=dag_id,
+                                            node_id=argv_node_desc["id"]
+                                        )
+                                    argv_data.append(argv_node_with_link)
+                    except Exception as e:
+                        logger.warning(f"Failed to get argv data for node {node_id}: {e}")
+                        # Fall back to basic node info without argv descriptions
+                        node_info = next((node for node in dag_data["nodes"] if node["id"] == node_id), None)
+                        if node_info:
+                            node_with_link = node_info.copy()
+                            node_with_link["link"] = url_for(
+                                "node_route",
+                                repo=repo,
+                                branch=branch,
+                                dag_id=dag_id,
+                                node_id=node_id
+                            )
+                            argv_data.append(node_with_link)
             except Exception as e:
                 logger.error(f"Error processing argv data: {e}")
                 argv_data = []
@@ -516,6 +359,232 @@ def api_dag_data():
     except Exception as e:
         logger.error(f"Error fetching DAG data: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/dag/plugins", methods=["GET"])
+def api_dag_plugins():
+    """
+    API endpoint to list all available DAG dashboard plugins.
+    Returns JSON array of plugin metadata.
+    """
+    print("Fetching DAG plugins")
+    try:
+        # Reload plugins to detect changes
+        reload_plugins()
+        print("Plugins reloaded successfully")
+        
+        plugins_list = []
+        for plugin_cls in discover_dag_plugins():
+            print(f"Found DAG plugin: {plugin_cls.NAME}")
+            plugins_list.append({
+                "id": plugin_cls.NAME,
+                "name": plugin_cls.NAME,
+                "description": plugin_cls.DESCRIPTION or 'No description available',
+            })
+        print(f"Total DAG plugins found: {len(plugins_list)}")
+        return jsonify(plugins_list)
+    except Exception as e:
+        logger.error(f"Error loading DAG plugins: {e}")
+        return jsonify({"error": "Failed to load DAG plugins"}), 500
+
+@app.route("/api/dag/plugins/<string:plugin_id>", methods=["GET"])
+def api_dag_plugin_content(plugin_id):
+    """
+    API endpoint to get DAG plugin content for a specific plugin.
+    Returns HTML content that will be embedded in an iframe.
+    """
+    print(f"Fetching content for DAG plugin: {plugin_id}")
+    try:
+        # Reload plugins to detect changes
+        reload_plugins()
+        
+        # Find the plugin by ID
+        plugins = [x for x in discover_dag_plugins() if x.NAME == plugin_id]
+        if not plugins:
+            return f"<div style='text-align: center; padding: 50px;'><h3>DAG Plugin '{plugin_id}' not found</h3></div>", 404
+        
+        if len(plugins) > 1:
+            return f"<div style='text-align: center; padding: 50px;'><h3>Multiple DAG plugins found with name '{plugin_id}'</h3></div>", 500
+        
+        plugin_cls = plugins[0]
+        
+        # Get DAG data
+        dag_id = request.args.get("dag_id")
+        if not dag_id:
+            return "<div style='text-align: center; padding: 50px;'><h3>No DAG ID provided</h3></div>", 400
+        
+        repo = request.args.get("repo")
+        branch = request.args.get("branch")
+        dml = Dml(repo=repo, branch=branch)
+        
+        # Load the actual DAG object
+        dag = dml.load(dag_id)
+        
+        # Initialize and render the plugin with dml instance and loaded dag
+        plugin_instance = plugin_cls(dml, dag)
+        try:
+            rendered_content = plugin_instance.render()
+        except Exception as plugin_error:
+            logger.error(f"DAG Plugin {plugin_id} failed to render: {plugin_error}")
+            rendered_content = f"""
+            <div class="alert alert-danger">
+                <h4><i class="bi bi-exclamation-triangle"></i> DAG Plugin Error</h4>
+                <p><strong>Plugin:</strong> {plugin_cls.NAME}</p>
+                <p><strong>Error:</strong> {str(plugin_error)}</p>
+                <details class="mt-3">
+                    <summary>Technical Details</summary>
+                    <pre class="mt-2 p-2 bg-light"><code>{repr(plugin_error)}</code></pre>
+                </details>
+            </div>
+            """
+        
+        # Wrap content in a complete HTML document for iframe
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{plugin_cls.NAME}</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body {{
+                    margin: 0;
+                    padding: 20px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                }}
+                .plugin-container {{
+                    max-width: 100%;
+                    overflow-x: auto;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="plugin-container">
+                {rendered_content}
+            </div>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        </body>
+        </html>
+        """
+        
+        return html_content, 200, {'Content-Type': 'text/html'}
+        
+    except Exception as e:
+        logger.error(f"Error rendering DAG plugin {plugin_id}: {e}", exc_info=True)
+        return f"<div class='alert alert-danger'>Error: {str(e)}</div>", 500
+
+@app.route("/api/node/plugins", methods=["GET"])
+def api_node_plugins():
+    """
+    API endpoint to list all available Node dashboard plugins.
+    Returns JSON array of plugin metadata.
+    """
+    try:
+        # Reload plugins to detect changes
+        reload_plugins()
+        
+        plugins_list = []
+        for plugin_cls in discover_node_plugins():
+            plugins_list.append({
+                "id": plugin_cls.NAME,
+                "name": plugin_cls.NAME,
+                "description": getattr(plugin_cls, 'DESCRIPTION', 'No description available')
+            })
+        
+        return jsonify(plugins_list)
+    except Exception as e:
+        logger.error(f"Error loading Node plugins: {e}")
+        return jsonify({"error": "Failed to load Node plugins"}), 500
+
+@app.route("/api/node/plugins/<string:plugin_id>", methods=["GET"])
+def api_node_plugin_content(plugin_id):
+    """
+    API endpoint to get Node plugin content for a specific plugin.
+    Returns HTML content that will be embedded in an iframe.
+    """
+    try:
+        # Reload plugins to detect changes
+        reload_plugins()
+        
+        # Find the plugin by ID
+        plugins = [x for x in discover_node_plugins() if x.NAME == plugin_id]
+        if not plugins:
+            return f"<div style='text-align: center; padding: 50px;'><h3>Node Plugin '{plugin_id}' not found</h3></div>", 404
+        
+        if len(plugins) > 1:
+            return f"<div style='text-align: center; padding: 50px;'><h3>Multiple Node plugins found with name '{plugin_id}'</h3></div>", 500
+        
+        plugin_cls = plugins[0]
+        
+        # Get Node data
+        dag_id = request.args.get("dag_id")
+        node_id = request.args.get("node_id")
+        if not dag_id or not node_id:
+            return "<div style='text-align: center; padding: 50px;'><h3>DAG ID and Node ID are required</h3></div>", 400
+        
+        repo = request.args.get("repo")
+        branch = request.args.get("branch")
+        dml = Dml(repo=repo, branch=branch)
+        
+        # Load the DAG and get the node
+        dag = dml.load(dag_id)
+        node = dag[node_id]
+        
+        # Initialize and render the plugin with dml instance and node
+        plugin_instance = plugin_cls(dml, node)
+        # Set the DAG ID for plugins that need it (like NodeDetailsPlugin)
+        plugin_instance._current_dag_id = dag_id
+        try:
+            rendered_content = plugin_instance.render()
+        except Exception as plugin_error:
+            logger.error(f"Node Plugin {plugin_id} failed to render: {plugin_error}")
+            rendered_content = f"""
+            <div class="alert alert-danger">
+                <h4><i class="bi bi-exclamation-triangle"></i> Node Plugin Error</h4>
+                <p><strong>Plugin:</strong> {plugin_cls.NAME}</p>
+                <p><strong>Error:</strong> {str(plugin_error)}</p>
+                <details class="mt-3">
+                    <summary>Technical Details</summary>
+                    <pre class="mt-2 p-2 bg-light"><code>{repr(plugin_error)}</code></pre>
+                </details>
+            </div>
+            """
+        
+        # Wrap content in a complete HTML document for iframe
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{plugin_cls.NAME}</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body {{
+                    margin: 0;
+                    padding: 20px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                }}
+                .plugin-container {{
+                    max-width: 100%;
+                    overflow-x: auto;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="plugin-container">
+                {rendered_content}
+            </div>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        </body>
+        </html>
+        """
+        
+        return html_content, 200, {'Content-Type': 'text/html'}
+        
+    except Exception as e:
+        logger.error(f"Error rendering Node plugin {plugin_id}: {e}", exc_info=True)
+        return f"<div class='alert alert-danger'>Error: {str(e)}</div>", 500
 
 def run():
     parser = ArgumentParser()

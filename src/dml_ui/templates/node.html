@@ -3,11 +3,13 @@
   
   This template displays detailed information about a specific node in a DAG.
   It uses a tabbed interface to organize different types of node data:
-  - Value: The computed value/result of the node
-  - Arguments: Individual command-line arguments if this is an argv node
+  - Info: Basic node metadata and links
+  - Data: The computed value/result of the node
+  - argv: Individual command-line arguments if this is an argv node
   - Code: Associated script content if available
   - Error: Stack trace if the node resulted in an error
   - HTML: Rendered HTML content if the node produces HTML output
+  - Plugins: Dynamic plugin content for extended node analysis
   
   The template expects the following context variables:
   - dag_data: Dictionary containing DAG metadata
@@ -16,6 +18,7 @@
   - script: Python script content (optional)
   - stack_trace: Error stack trace (optional)
   - html_uri: Pre-signed URL for HTML content (optional)
+  - node_description: Full node description from dml describe command (optional)
 #}
 
 {% extends "layout.html" %}
@@ -74,6 +77,24 @@
     [data-bs-theme="dark"] .argv-value {
       background-color: var(--bs-gray-800);
     }
+    
+    /* Plugin container styling */
+    #plugin-container {
+      min-height: 60vh;
+    }
+    
+    #plugin-container iframe {
+      width: 100%;
+      height: 60vh;
+      border: none;
+    }
+    
+    .plugin-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+    }
   </style>
 {% endblock %}
 
@@ -91,7 +112,7 @@
          based on available data:
          - Info: Always shown, contains basic node metadata
          - Data: Always shown, contains the node's computed value
-         - Arguments: Shown only for argv nodes with argument data
+         - argv: Shown only for argv nodes with argument data
          - Code: Shown only if script content is available
          - Stacktrace: Shown only if error occurred
          - HTML: Shown only if node produces HTML output
@@ -103,9 +124,11 @@
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="data-tab" data-bs-toggle="tab" data-bs-target="#data" type="button" role="tab" aria-controls="data" aria-selected="false">Data</button>
       </li>
-      <li class="nav-item" role="presentation" id="argv-tab-container" style="display: none;">
-        <button class="nav-link" id="argv-tab" data-bs-toggle="tab" data-bs-target="#argv" type="button" role="tab" aria-controls="argv" aria-selected="false">Arguments</button>
+      {% if argv_elements %}
+      <li class="nav-item" role="presentation" id="argv-tab-container">
+        <button class="nav-link" id="argv-tab" data-bs-toggle="tab" data-bs-target="#argv" type="button" role="tab" aria-controls="argv" aria-selected="false">argv</button>
       </li>
+      {% endif %}
       {% if script %}
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code" type="button" role="tab" aria-controls="code" aria-selected="false">Code</button>
@@ -121,6 +144,9 @@
         <button class="nav-link" id="html-tab" data-bs-toggle="tab" data-bs-target="#html" type="button" role="tab" aria-controls="html" aria-selected="false">HTML</button>
       </li>
       {% endif %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="plugins-tab" data-bs-toggle="tab" data-bs-target="#plugins" type="button" role="tab" aria-controls="plugins" aria-selected="false">Plugins</button>
+      </li>
     </ul>
     
     <!-- Tab Content -->
@@ -168,33 +194,86 @@
         </div>
       </div>
       
-      <!-- Arguments Tab
+      <!-- argv Tab
            Displays command-line arguments for argv nodes as individual cards.
            Each card shows the argument's index, type, and formatted value.
-           Content is populated dynamically by JavaScript using data from #argv-data script tag.
-           The tab is hidden by default and shown only when argv data is available.
+           Content is rendered server-side when argv data is available.
       -->
+      {% if argv_elements %}
       <div class="tab-pane fade" id="argv" role="tabpanel" aria-labelledby="argv-tab">
         <div class="container-fluid">
           <div class="card">
             <div class="card-header">
               <h5 class="card-title mb-0">
                 <i class="bi bi-list-ul me-2"></i>
-                Arguments
+                argv
               </h5>
-              <p class="text-muted mb-0 small">Individual argument values</p>
+              <p class="text-muted mb-0 small">Individual argv node details</p>
             </div>
-            <div class="card-body" id="argvContent">
-              <div class="text-center p-4">
-                <div class="spinner-border" role="status">
-                  <span class="visually-hidden">Loading...</span>
+            <div class="card-body">
+              <div class="row">
+                {% for element in argv_elements %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card argv-card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                      <span class="badge bg-primary argv-index">argv[{{ element.index }}]</span>
+                      <div class="d-flex align-items-center gap-1">
+                        {% if element.node_type %}
+                        <span class="badge bg-secondary">{{ element.node_type }}</span>
+                        {% endif %}
+                        {% if element.data_type %}
+                        <span class="badge bg-info">{{ element.data_type }}</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      {% if element.doc %}
+                      <div class="mb-3">
+                        <p class="small text-muted mb-0">{{ element.doc }}</p>
+                      </div>
+                      {% endif %}
+                      
+                      <div class="small">
+                        {% if element.id %}
+                        <div class="mb-1">
+                          <strong>ID:</strong> <code class="small">{{ element.id }}</code>
+                        </div>
+                        {% endif %}
+                        
+                        {% if element.length is not none %}
+                        <div class="mb-1">
+                          <strong>Length:</strong> {{ element.length }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if element.dict_keys %}
+                        <div class="mb-1">
+                          <strong>Keys:</strong>
+                          <div class="mt-1">
+                            {% for key in element.dict_keys %}
+                            <span class="badge bg-light text-dark me-1">{{ key }}</span>
+                            {% endfor %}
+                          </div>
+                        </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                    {% if element.id %}
+                    <div class="card-footer">
+                      <a href="{{ url_for('node_route', repo=request.args.get('repo'), branch=request.args.get('branch'), dag_id=dag_id, node_id=element.id) }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-right-circle"></i> View Node
+                      </a>
+                    </div>
+                    {% endif %}
+                  </div>
                 </div>
-                <p class="mt-2">Loading arguments...</p>
+                {% endfor %}
               </div>
             </div>
           </div>
         </div>
       </div>
+      {% endif %}
       
       <!-- Code Tab -->
       {% if script %}
@@ -248,15 +327,165 @@
         </div>
       </div>
       {% endif %}
+      
+      <!-- Plugins Tab -->
+      <div class="tab-pane fade" id="plugins" role="tabpanel" aria-labelledby="plugins-tab">
+        <div class="container-fluid">
+          <div class="card">
+            <div class="card-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                  <i class="bi bi-plugin me-2"></i>
+                  Plugins
+                </h5>
+                <div class="dropdown">
+                  <button class="btn btn-outline-primary dropdown-toggle" type="button" id="plugin-selector" data-bs-toggle="dropdown" aria-expanded="false">
+                    Select Plugin
+                  </button>
+                  <ul class="dropdown-menu" id="plugin-dropdown" aria-labelledby="plugin-selector">
+                    <li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="card-body p-0">
+              <div id="plugin-container" style="width: 100%; min-height: 60vh; border: none; background-color: #f8f9fa;">
+                <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                  <div class="text-center">
+                    <i class="bi bi-plugin fs-1 mb-3"></i>
+                    <p>Select a plugin from the dropdown above to display its content</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   
-  <!-- Pass argv_elements data to JavaScript -->
-  {% if argv_elements %}
-  <script type="application/json" id="argv-data">{{ argv_elements|tojson|safe }}</script>
-  {% endif %}
-  
   <script>
+    /**
+     * Node plugin functionality
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      const pluginDropdown = document.getElementById('plugin-dropdown');
+      const pluginSelector = document.getElementById('plugin-selector');
+      const pluginContainer = document.getElementById('plugin-container');
+      
+      // Load available plugins when plugins tab is first clicked
+      document.getElementById('plugins-tab').addEventListener('click', function() {
+        if (!this.dataset.pluginsLoaded) {
+          loadPlugins();
+          this.dataset.pluginsLoaded = 'true';
+        }
+      });
+      
+      function loadPlugins() {
+        pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>';
+        
+        // Fetch available node plugins from backend
+        fetch('/api/node/plugins')
+          .then(response => response.json())
+          .then(plugins => {
+            if (plugins && plugins.length > 0) {
+              pluginDropdown.innerHTML = plugins.map(plugin => 
+                `<li><a class="dropdown-item" href="#" data-plugin-id="${plugin.id}">${plugin.name}</a></li>`
+              ).join('');
+              
+              // Add click event listeners to plugin options
+              pluginDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                  e.preventDefault();
+                  const pluginId = this.dataset.pluginId;
+                  const pluginName = this.textContent;
+                  loadPlugin(pluginId, pluginName);
+                });
+              });
+            } else {
+              pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">No plugins available</span></li>';
+            }
+          })
+          .catch(error => {
+            console.error('Error loading plugins:', error);
+            pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-danger">Error loading plugins</span></li>';
+          });
+      }
+      
+      function loadPlugin(pluginId, pluginName) {
+        // Update dropdown button text
+        pluginSelector.innerHTML = pluginName + ' <span class="caret"></span>';
+        
+        // Show loading state
+        showPluginLoading();
+        
+        // Get current parameters from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const dagId = urlParams.get('dag_id');
+        const nodeId = urlParams.get('node_id');
+        const repo = urlParams.get('repo');
+        const branch = urlParams.get('branch');
+        
+        // Build plugin URL with all necessary parameters
+        let pluginUrl = `/api/node/plugins/${encodeURIComponent(pluginId)}?dag_id=${encodeURIComponent(dagId)}&node_id=${encodeURIComponent(nodeId)}`;
+        if (repo) {
+          pluginUrl += `&repo=${encodeURIComponent(repo)}`;
+        }
+        if (branch) {
+          pluginUrl += `&branch=${encodeURIComponent(branch)}`;
+        }
+        
+        // Fetch plugin content
+        fetch(pluginUrl)
+          .then(response => response.text())
+          .then(html => {
+            // Create isolated iframe for plugin content
+            const iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.height = '60vh';
+            iframe.style.border = 'none';
+            iframe.sandbox = 'allow-scripts allow-same-origin allow-forms';
+            
+            // Clear container and add iframe
+            pluginContainer.innerHTML = '';
+            pluginContainer.appendChild(iframe);
+            
+            // Write plugin content to iframe
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(html);
+            iframe.contentDocument.close();
+          })
+          .catch(error => {
+            console.error('Error loading plugin:', error);
+            showPluginError('Failed to load plugin content');
+          });
+      }
+      
+      function showPluginLoading() {
+        pluginContainer.innerHTML = `
+          <div class="d-flex align-items-center justify-content-center h-100">
+            <div class="text-center">
+              <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="text-muted">Loading plugin...</p>
+            </div>
+          </div>
+        `;
+      }
+      
+      function showPluginError(message) {
+        pluginContainer.innerHTML = `
+          <div class="d-flex align-items-center justify-content-center h-100">
+            <div class="text-center">
+              <i class="bi bi-exclamation-triangle text-danger fs-1 mb-3"></i>
+              <p class="text-danger">${message}</p>
+            </div>
+          </div>
+        `;
+      }
+    });
+
     /**
      * Escapes HTML characters to prevent XSS and ensure proper display.
      * 
@@ -270,80 +499,8 @@
       return div.innerHTML;
     }
 
-    /**
-     * Populates the arguments tab with individual argument cards.
-     * 
-     * This function reads argv data from a JSON script tag and creates Bootstrap cards
-     * for each command-line argument. Each card displays the argument's index, type,
-     * and formatted value. The argv tab is only shown if argument data is available.
-     * 
-     * Expected JSON structure in #argv-data script tag:
-     * [
-     *   {
-     *     "index": 0,
-     *     "value": "formatted argument value",
-     *     "type": "str"
-     *   },
-     *   ...
-     * ]
-     */
-    function populateNodeArgvTab() {
-      const argvContent = document.getElementById('argvContent');
-      const argvTabContainer = document.getElementById('argv-tab-container');
-      
-      if (!argvContent || !argvTabContainer) return;
-      
-      // Get argv elements data from the script tag
-      const argvDataElement = document.getElementById('argv-data');
-      if (argvDataElement) {
-        try {
-          const argvElements = JSON.parse(argvDataElement.textContent);
-          
-          if (argvElements && argvElements.length > 0) {
-            // Show the argv tab
-            argvTabContainer.style.display = 'block';
-            
-            // Create cards for each argument
-            const argvCards = argvElements.map((element) => {
-              return `
-                <div class="col-md-6 col-lg-4 mb-3">
-                  <div class="card argv-card h-100">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                      <span class="badge bg-primary argv-index">Argument ${element.index}</span>
-                      <span class="badge bg-secondary">${escapeHtml(element.type)}</span>
-                    </div>
-                    <div class="card-body">
-                      <div class="argv-value">${escapeHtml(element.value)}</div>
-                    </div>
-                  </div>
-                </div>
-              `;
-            }).join('');
-            
-            argvContent.innerHTML = `
-              <div class="row">
-                ${argvCards}
-              </div>
-            `;
-          } else {
-            // Hide the argv tab if no arguments found
-            argvTabContainer.style.display = 'none';
-          }
-        } catch (e) {
-          console.error('Error parsing argv data:', e);
-          argvTabContainer.style.display = 'none';
-        }
-      } else {
-        // Hide the argv tab if no argv_elements data
-        argvTabContainer.style.display = 'none';
-      }
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
       hljs.highlightAll();
-      
-      // Populate argv tab if this is an argv node
-      populateNodeArgvTab();
     });
   </script>
 {% endblock %}

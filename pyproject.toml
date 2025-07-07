@@ -45,6 +45,14 @@ Source = "https://github.com/daggerml/dml-ui"
 [project.scripts]
 dml-ui-dev = "dml_ui.impl:run"
 
+[project.entry-points."dml_ui.dashboard.dag"]
+example_dag_plugin = "dml_ui.plugins:ExampleDagPlugin"
+dag_stats_plugin = "dml_ui.plugins:DagStatsPlugin"
+
+[project.entry-points."dml_ui.dashboard.node"]
+example_node_plugin = "dml_ui.plugins:ExampleNodePlugin"
+node_details_plugin = "dml_ui.plugins:NodeDetailsPlugin"
+
 [tool.hatch.version]
 path = "src/dml_ui/__about__.py"
 
