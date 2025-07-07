@@ -76,7 +76,7 @@ def get_node_repr(dag, node_id):
     }
 
 
-def get_dag_info(dml, dag_id):
+def get_dag_info(dml, dag_id, prune=False):
     out = {"dag_data": dml("dag", "describe", dag_id)}
     dag_data = out["dag_data"]
     for node in dag_data["nodes"]:

@@ -43,7 +43,7 @@ Source = "https://github.com/daggerml/dml-ui"
 
 # script entry points
 [project.scripts]
-dml-ui-dev = "dml_ui.app.impl:run"
+dml-ui-dev = "dml_ui.impl:run"
 
 [project.entry-points."dml_ui.dashboard_plugins"]
 my_matplotlib_plugin = "dml_ui.plugins:MatplotlibStatsPlugin"

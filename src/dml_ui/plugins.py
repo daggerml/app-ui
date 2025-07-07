@@ -1,6 +1,9 @@
 import base64
+from flask import url_for
 import importlib.metadata
 import io
+
+from daggerml import Dag, Node
 
 # Configure matplotlib backend before any imports to prevent GUI issues
 try:
@@ -14,21 +17,33 @@ class DashboardPlugin:
     NAME = None
     DESCRIPTION = None
 
-    def render(self, dml, dag, **kwargs):
+    def render(self, dml, obj, **kwargs):
         """
         Return HTML (or Flask Response) to embed in the dashboard.
-        
-        Args:
-            dml: The Dml instance for accessing the API
-            dag: The DAG structure from dml("dag", "describe", dag_id)
-                 Contains 'nodes' and 'edges' arrays with metadata
-            **kwargs: Additional context including:
-                - dag_id: The DAG identifier
-                - repo: Repository name
-                - branch: Branch name
-                - dag_object: The loaded DAG object from dml.load(dag_id) for value access
+
+        Parameters
+        ----------
+        dml: The Dml instance for accessing the API
+        obj: The object to render (e.g., Dag or Node)
+        **kwargs: Additional context including:
+            - dag_id: The DAG identifier
+            - repo: Repository name
+            - branch: Branch name
+            - dag_object: The loaded DAG object from dml.load(dag_id) for value access
         """
         raise NotImplementedError
+
+    def url_for(self, dml, obj):
+        """
+        Generate the Url for a given dml object (e.g., Dag or Node).
+
+        Parameters
+        ----------
+        dml: The Dml instance for accessing the API
+        obj: The object to render (e.g., Dag or Node)
+        """
+        page = "dag_route" if isinstance(obj, Dag) else "node_route"
+        return url_for(page, obj_id=obj.id)
 
 
 def discover_plugins():

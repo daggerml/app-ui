@@ -293,7 +293,7 @@
     <div class="form-check form-switch filter-nodes-container">
       <input class="form-check-input" type="checkbox" id="filterNodesSwitch" checked style="transform: scale(0.9);">
       <label class="form-check-label text-muted small" for="filterNodesSwitch" style="font-size: 0.85rem;">
-        Filter nodes
+        Prune graph
       </label>
     </div>
     
@@ -305,73 +305,22 @@
           DAG Statistics
         </div>
         
-        <div class="dag-stats-grid">
+        <div class="dag-stats-grid" id="dagStatsGrid">
+          <!-- Statistics will be populated dynamically -->
           <div class="dag-stat-item">
-            <div class="dag-stat-value">{{ data.nodes|length }}</div>
-            <div class="dag-stat-label">Nodes</div>
+            <div class="dag-stat-value">
+              <div class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem;">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </div>
+            <div class="dag-stat-label">Loading...</div>
           </div>
-          
-          <div class="dag-stat-item">
-            <div class="dag-stat-value">{{ data.edges|length }}</div>
-            <div class="dag-stat-label">Edges</div>
-          </div>
-          
-          {% set node_types = {} %}
-          {% for node in data.nodes %}
-            {% set _ = node_types.update({node.node_type: node_types.get(node.node_type, 0) + 1}) %}
-          {% endfor %}
-          
-          <div class="dag-stat-item clickable" 
-               data-bs-toggle="tooltip" 
-               data-bs-placement="bottom"
-               data-bs-html="true"
-               title="Node Types:<br>{% for type, count in node_types.items() %}<strong>{{ type }}:</strong> {{ count }}<br>{% endfor %}">
-            <div class="dag-stat-value">{{ node_types|length }}</div>
-            <div class="dag-stat-label">Types</div>
-          </div>
-          
-          <!-- Calculate execution stats if available -->
-          {% set executed_nodes = data.nodes | selectattr('executed', 'defined') | list %}
-          {% if executed_nodes %}
-          <div class="dag-stat-item">
-            <div class="dag-stat-value">{{ executed_nodes | length }}</div>
-            <div class="dag-stat-label">Executed</div>
-          </div>
-          {% endif %}
-          
-          <!-- Calculate depth (longest path) -->
-          {% set max_depth = 0 %}
-          {% for node in data.nodes %}
-            {% if node.get('depth', 0) > max_depth %}
-              {% set max_depth = node.depth %}
-            {% endif %}
-          {% endfor %}
-          {% if max_depth > 0 %}
-          <div class="dag-stat-item">
-            <div class="dag-stat-value">{{ max_depth }}</div>
-            <div class="dag-stat-label">Depth</div>
-          </div>
-          {% endif %}
         </div>
         
         <!-- Metadata Section -->
-        {% if data.name or data.id %}
-        <div class="dag-stat-meta">
-          {% if data.name %}
-          <div class="dag-meta-item">
-            <div class="dag-meta-label">Name</div>
-            <div class="dag-meta-value" title="{{ data.name }}">{{ data.name }}</div>
-          </div>
-          {% endif %}
-          
-          {% if data.id %}
-          <div class="dag-meta-item">
-            <div class="dag-meta-label">ID</div>
-            <div class="dag-meta-value" title="{{ data.id }}">{{ data.id[:12] }}{% if data.id|length > 12 %}...{% endif %}</div>
-          </div>
-          {% endif %}
+        <div class="dag-stat-meta" id="dagStatsMeta">
+          <!-- Metadata will be populated dynamically -->
         </div>
-        {% endif %}
       </div>
     </div>
   </div>
@@ -382,31 +331,24 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="table-tab" data-bs-toggle="tab" data-bs-target="#table" type="button" role="tab" aria-controls="table" aria-selected="false">Node Table</button>
     </li>
-    {% if script %}
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" id="argv-tab-container" style="display: none;">
+      <button class="nav-link" id="argv-tab" data-bs-toggle="tab" data-bs-target="#argv" type="button" role="tab" aria-controls="argv" aria-selected="false">Arguments</button>
+    </li>
+    <li class="nav-item" role="presentation" id="code-tab-container" style="display: none;">
       <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code" type="button" role="tab" aria-controls="code" aria-selected="false">Executed Code</button>
     </li>
-    {% endif %}
-    {% if log_streams %}
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" id="logs-tab-container" style="display: none;">
       <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab" aria-controls="logs" aria-selected="false">Logs</button>
     </li>
-    {% endif %}
-    {% if error %}
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" id="error-tab-container" style="display: none;">
       <button class="nav-link" id="error-tab" data-bs-toggle="tab" data-bs-target="#error" type="button" role="tab" aria-controls="error" aria-selected="false">Error</button>
     </li>
-    {% endif %}
-    {% if result %}
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" id="result-tab-container" style="display: none;">
       <button class="nav-link" id="result-tab" data-bs-toggle="tab" data-bs-target="#result" type="button" role="tab" aria-controls="result" aria-selected="false">Result</button>
     </li>
-    {% endif %}
-    {% if html_uri %}
-    <li class="nav-item" role="presentation">
+    <li class="nav-item" role="presentation" id="html-tab-container" style="display: none;">
       <button class="nav-link" id="html-tab" data-bs-toggle="tab" data-bs-target="#html" type="button" role="tab" aria-controls="html" aria-selected="false">HTML</button>
     </li>
-    {% endif %}
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="false">Dashboard</button>
     </li>
@@ -418,7 +360,15 @@
         <button class="btn btn-outline-secondary btn-sm me-2" id="cy-zoom-out" title="Zoom Out"><i class="bi bi-zoom-out"></i> Zoom Out</button>
         <button class="btn btn-outline-secondary btn-sm" id="cy-reset" title="Reset View"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
       </div>
-      <div id="cy">
+      <div style="position: relative;">
+        <div id="cy">
+          <div class="text-center p-4">
+            <div class="spinner-border" role="status">
+              <span class="visually-hidden">Loading graph...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading DAG visualization...</p>
+          </div>
+        </div>
         <div class="legend" id="cy-legend">
           <h3>Shape</h3>
           <div class="legend-item">
@@ -450,84 +400,92 @@
         </table>
       </div>
     </div>
-    {% if script %}
+    <div class="tab-pane fade" id="argv" role="tabpanel" aria-labelledby="argv-tab">
+      <div class="container-fluid">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-list-ul me-2"></i>
+              Arguments
+            </h5>
+            <p class="text-muted mb-0 small">Node arguments passed to this DAG</p>
+          </div>
+          <div class="card-body" id="argvContent">
+            <div class="text-center p-4">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Loading arguments...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="tab-pane fade" id="code" role="tabpanel" aria-labelledby="code-tab">
       <div class="container-fluid">
         <div class="card code-container">
           <div class="card-header">
             <h5 class="card-title mb-0">Executed Code</h5>
           </div>
-          <div class="card-body p-0">
-            <pre class="mb-0"><code class="language-python">{{ script }}</code></pre>
-          </div>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-    {% if log_streams %}
-    <div class="tab-pane fade" id="logs" role="tabpanel" aria-labelledby="logs-tab">
-      <div class="accordion" id="logsAccordion">
-        {% for stream_name in log_streams.keys() %}
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="heading-{{ stream_name }}">
-            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ stream_name }}" aria-expanded="{% if loop.first %}true{% else %}false{% endif %}" aria-controls="collapse-{{ stream_name }}">
-              {{ stream_name }}
-            </button>
-          </h2>
-          <div id="collapse-{{ stream_name }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" aria-labelledby="heading-{{ stream_name }}" data-bs-parent="#logsAccordion">
-            <div class="accordion-body">
-              <div class="log-container" id="{{ stream_name }}-log-container">
-                <div class="log-content" id="{{ stream_name }}-log-content">
-                  <div class="text-center">
-                    <div class="spinner-border spinner-border-sm" role="status">
-                      <span class="visually-hidden">Loading...</span>
-                    </div>
-                    Loading logs...
-                  </div>
-                </div>
+          <div class="card-body p-0" id="codeContent">
+            <div class="text-center p-4">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
               </div>
-              <div class="log-pagination mt-2">
-                <button class="btn btn-sm btn-outline-primary load-more-logs" data-stream-name="{{ stream_name }}" data-direction="backward" disabled>
-                  ⬆️ Older logs
-                </button>
-                <span class="text-muted small">Page <span id="{{ stream_name }}-log-page">1</span></span>
-                <button class="btn btn-sm btn-outline-primary load-more-logs" data-stream-name="{{ stream_name }}" data-direction="forward" disabled>
-                  ⬇️ Newer logs
-                </button>
-              </div>
+              <p class="mt-2">Loading code...</p>
             </div>
           </div>
         </div>
-        {% endfor %}
       </div>
     </div>
-    {% endif %}
-    {% if error %}
-    <div class="tab-pane fade" id="error" role="tabpanel" aria-labelledby="error-tab">
-      <pre><code class="language-python">{{ error }}</code></pre>
+    <div class="tab-pane fade" id="logs" role="tabpanel" aria-labelledby="logs-tab">
+      <div class="accordion" id="logsAccordion">
+        <!-- Logs content will be populated dynamically -->
+        <div class="text-center p-4">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2">Loading logs...</p>
+        </div>
+      </div>
     </div>
-    {% endif %}
-    {% if result %}
+    <div class="tab-pane fade" id="error" role="tabpanel" aria-labelledby="error-tab">
+      <div id="errorContent">
+        <div class="text-center p-4">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2">Loading error information...</p>
+        </div>
+      </div>
+    </div>
     <div class="tab-pane fade" id="result" role="tabpanel" aria-labelledby="result-tab">
       <div class="container-fluid">
         <div class="card code-container">
           <div class="card-header">
             <h5 class="card-title mb-0">Result</h5>
           </div>
-          <div class="card-body p-0">
-            <pre class="mb-0"><code class="language-python">{{ result }}</code></pre>
+          <div class="card-body p-0" id="resultContent">
+            <div class="text-center p-4">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Loading result...</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    {% endif %}
-    {% if html_uri %}
     <div class="tab-pane fade" id="html" role="tabpanel" aria-labelledby="html-tab">
-      <iframe src="{{ html_uri }}"
-              style="width: 100%; height: 100vh; border: none;"
-              sandbox="allow-scripts allow-same-origin"></iframe>
+      <div id="htmlContent">
+        <div class="text-center p-4">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2">Loading HTML content...</p>
+        </div>
+      </div>
     </div>
-    {% endif %}
     <div class="tab-pane fade" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
       <div class="container-fluid">
         <div class="card">
@@ -561,106 +519,710 @@
 </div>
 
 <script>
-  // Safely inject data for JS
-  const graphData = {{ data|tojson|safe }};
-  // Pre-initialize logState for all streams (if any)
-  const logState = {{ log_streams|default({})|tojson|safe }};
-  // Convert logState values to expected structure
-  for (const k in logState) {
-    logState[k] = { page: 1, nextForwardToken: null, nextBackwardToken: null };
+  // Global variables for DAG data
+  let graphData = null;
+  let logState = {};
+  let dagData = null;
+
+  // Get URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const dagId = urlParams.get('dag_id');
+  const repo = urlParams.get('repo');
+  const branch = urlParams.get('branch');
+  const prune = urlParams.get('prune') !== 'false'; // Default to true (pruned)
+
+  // Function to load DAG data dynamically
+  async function loadDAGData(pruneNodes = null) {
+    try {
+      // Use provided prune parameter or fall back to URL parameter
+      const shouldPrune = pruneNodes !== null ? pruneNodes : prune;
+      
+      let apiUrl = `/api/dag?dag_id=${encodeURIComponent(dagId)}`;
+      if (repo) apiUrl += `&repo=${encodeURIComponent(repo)}`;
+      if (branch) apiUrl += `&branch=${encodeURIComponent(branch)}`;
+      // Note: Removed --prune flag due to bug in DML library
+      // We'll implement pruning logic client-side instead
+
+      console.log('DEBUG: Making API call to:', apiUrl);
+      console.log('DEBUG: shouldPrune value:', shouldPrune);
+
+      const response = await fetch(apiUrl);
+      console.log('DEBUG: Response status:', response.status);
+      console.log('DEBUG: Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('DEBUG: Error response text:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('DEBUG: Received data:', data);
+      console.log('DEBUG: Data keys:', Object.keys(data || {}));
+      
+      if (data && data.dag_data) {
+        console.log('DEBUG: dag_data before pruning - nodes:', data.dag_data.nodes?.length, 'edges:', data.dag_data.edges?.length);
+      }
+      
+      // Apply client-side pruning if requested
+      if (shouldPrune && data && data.dag_data) {
+        console.log('DEBUG: Applying client-side pruning');
+        data.dag_data = applyCustomPruning(data.dag_data);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('DEBUG: Error in loadDAGData:', error);
+      showError('Failed to load DAG data: ' + error.message);
+      return null;
+    }
   }
-  
-  // Initialize Bootstrap tooltips for stats cards and enhanced stats functionality
-  document.addEventListener('DOMContentLoaded', function() {
-    // Initialize tooltips
+
+  // Custom pruning logic to work around DML library bug
+  function applyCustomPruning(dagData) {
+    console.log('DEBUG: Applying custom pruning logic...');
+    console.log('DEBUG: Input dagData:', dagData);
+    
+    if (!dagData || !dagData.nodes || !dagData.edges) {
+      console.log('DEBUG: Invalid dagData structure, returning as-is');
+      return dagData;
+    }
+    
+    // Create a copy of the DAG data to avoid mutating the original
+    const prunedData = {
+      ...dagData,
+      nodes: [...dagData.nodes],
+      edges: [...dagData.edges]
+    };
+    
+    console.log('DEBUG: Before pruning - nodes:', prunedData.nodes.length, 'edges:', prunedData.edges.length);
+    
+    // Step 1: Remove nodes with prunable: true
+    const prunableNodeIds = new Set();
+    prunedData.nodes = prunedData.nodes.filter(node => {
+      if (node.prunable === true) {
+        prunableNodeIds.add(node.id);
+        console.log(`DEBUG: Removing prunable node: ${node.id} (${node.name || 'unnamed'})`);
+        return false;
+      }
+      return true;
+    });
+    
+    console.log('DEBUG: Removed', prunableNodeIds.size, 'prunable nodes');
+    
+    // Step 2: Process edges with prunable: true
+    const processedEdges = [];
+    let edgesDropped = 0;
+    let edgesRedirected = 0;
+    
+    for (const edge of prunedData.edges) {
+      // Skip edges that reference pruned nodes
+      if (prunableNodeIds.has(edge.source) || prunableNodeIds.has(edge.target)) {
+        console.log(`DEBUG: Skipping edge referencing pruned node: ${edge.source} -> ${edge.target}`);
+        edgesDropped++;
+        continue;
+      }
+      
+      if (edge.prunable === true) {
+        if (edge.prune_source) {
+          // Redirect the edge to use prune_source as the new source
+          const redirectedEdge = {
+            ...edge,
+            source: edge.prune_source,
+            prunable: false // Mark as processed
+          };
+          console.log(`DEBUG: Redirecting prunable edge: ${edge.source} -> ${edge.target} becomes ${edge.prune_source} -> ${edge.target}`);
+          processedEdges.push(redirectedEdge);
+          edgesRedirected++;
+        } else {
+          // Drop the edge entirely
+          console.log(`DEBUG: Dropping prunable edge without prune_source: ${edge.source} -> ${edge.target}`);
+          edgesDropped++;
+        }
+      } else {
+        // Keep the edge as-is
+        processedEdges.push(edge);
+      }
+    }
+    
+    prunedData.edges = processedEdges;
+    
+    console.log(`DEBUG: Pruning complete:`);
+    console.log(`DEBUG:   Nodes: ${dagData.nodes.length} -> ${prunedData.nodes.length}`);
+    console.log(`DEBUG:   Edges: ${dagData.edges.length} -> ${prunedData.edges.length}`);
+    console.log(`DEBUG:   Edges dropped: ${edgesDropped}, redirected: ${edgesRedirected}`);
+    
+    return prunedData;
+  }
+
+  // Function to populate DAG statistics
+  function populateDAGStats(data) {
+    const statsGrid = document.getElementById('dagStatsGrid');
+    const statsMeta = document.getElementById('dagStatsMeta');
+    
+    if (!data || !data.dag_data) return;
+    
+    const dagData = data.dag_data;
+    const nodes = dagData.nodes || [];
+    const edges = dagData.edges || [];
+    
+    // Calculate node types
+    const nodeTypes = {};
+    nodes.forEach(node => {
+      const type = node.node_type || 'unknown';
+      nodeTypes[type] = (nodeTypes[type] || 0) + 1;
+    });
+    
+    // Calculate executed nodes
+    const executedNodes = nodes.filter(node => node.executed !== undefined);
+    
+    // Calculate max depth
+    let maxDepth = 0;
+    nodes.forEach(node => {
+      if (node.depth && node.depth > maxDepth) {
+        maxDepth = node.depth;
+      }
+    });
+    
+    // Create tooltip content for node types
+    let tooltipContent = 'Node Types:<br>';
+    for (const [type, count] of Object.entries(nodeTypes)) {
+      tooltipContent += `<strong>${type}:</strong> ${count}<br>`;
+    }
+    
+    // Populate stats grid
+    statsGrid.innerHTML = `
+      <div class="dag-stat-item">
+        <div class="dag-stat-value">${nodes.length}</div>
+        <div class="dag-stat-label">Nodes</div>
+      </div>
+      
+      <div class="dag-stat-item">
+        <div class="dag-stat-value">${edges.length}</div>
+        <div class="dag-stat-label">Edges</div>
+      </div>
+      
+      <div class="dag-stat-item clickable" 
+           data-bs-toggle="tooltip" 
+           data-bs-placement="bottom"
+           data-bs-html="true"
+           title="${tooltipContent}">
+        <div class="dag-stat-value">${Object.keys(nodeTypes).length}</div>
+        <div class="dag-stat-label">Types</div>
+      </div>
+      
+      ${executedNodes.length > 0 ? `
+      <div class="dag-stat-item">
+        <div class="dag-stat-value">${executedNodes.length}</div>
+        <div class="dag-stat-label">Executed</div>
+      </div>
+      ` : ''}
+      
+      ${maxDepth > 0 ? `
+      <div class="dag-stat-item">
+        <div class="dag-stat-value">${maxDepth}</div>
+        <div class="dag-stat-label">Depth</div>
+      </div>
+      ` : ''}
+    `;
+    
+    // Populate metadata
+    let metaHtml = '';
+    if (dagData.name || dagData.id) {
+      if (dagData.name) {
+        metaHtml += `
+          <div class="dag-meta-item">
+            <div class="dag-meta-label">Name</div>
+            <div class="dag-meta-value" title="${dagData.name}">${dagData.name}</div>
+          </div>
+        `;
+      }
+      if (dagData.id) {
+        const shortId = dagData.id.length > 12 ? dagData.id.substring(0, 12) + '...' : dagData.id;
+        metaHtml += `
+          <div class="dag-meta-item">
+            <div class="dag-meta-label">ID</div>
+            <div class="dag-meta-value" title="${dagData.id}">${shortId}</div>
+          </div>
+        `;
+      }
+    }
+    statsMeta.innerHTML = metaHtml;
+    
+    // Re-initialize tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
+    tooltipTriggerList.forEach(tooltipTriggerEl => {
+      new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  }
+
+  // Function to populate node table
+  function populateNodeTable(data) {
+    const tableBody = document.getElementById('nodeTable');
+    if (!data || !data.dag_data) return;
+    
+    const nodes = data.dag_data.nodes || [];
+    
+    tableBody.innerHTML = nodes
+      .sort((a, b) => ((a.name || "") > (b.name || "") ? 1 : -1))
+      .map(node => {
+        let parent = "";
+        if (node.parent) {
+          parent = `<a href="${node.parent_link || '#'}">${node.parent}</a>`;
+        }
+        
+        let node_type = node.node_type || 'N/A';
+        if (node.sublist && node.sublist.length > 0) {
+          let inner = node.sublist
+            .map((subnode, index) => {
+              return `<li><a href="${subnode[1]}" class="dropdown-item">${subnode[0].substring(0, 8)}</a></li>`
+            })
+            .join('');
+          node_type = `
+            <div class="dropdown">
+              <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                ${node.node_type}
+              </button>
+              <ul class="dropdown-menu">
+                ${inner}
+              </ul>
+            </div>
+          `;
+        }
+        
+        return `
+          <tr data-node-id="${node.id}" ${node.id == data.dag_data.result ? 'class="border border-primary"' : ""}>
+            <td><a href="${node.link || '#'}">${(node.id || 'N/A').substring(0, 8)}</a></td>
+            <td>${node.name || 'N/A'}</td>
+            <td>${parent}</td>
+            <td>${node_type}</td>
+            <td>${node.data_type || 'N/A'}</td>
+            <td>${node.doc || 'N/A'}</td>
+          </tr>
+        `;
+      }).join('');
+  }
+
+  // Function to show tabs based on available data
+  function updateTabVisibility(data) {
+    const tabMap = {
+      'argv-tab-container': data.argv && data.argv.length > 0,
+      'code-tab-container': data.script,
+      'logs-tab-container': data.log_streams && Object.keys(data.log_streams).length > 0,
+      'error-tab-container': data.error,
+      'result-tab-container': data.result,
+      'html-tab-container': data.html_uri
+    };
+    
+    for (const [containerId, show] of Object.entries(tabMap)) {
+      const container = document.getElementById(containerId);
+      if (container) {
+        container.style.display = show ? 'block' : 'none';
+      }
+    }
+  }
+
+  // Function to populate tab content
+  function populateTabContent(data) {
+    // Code tab
+    if (data.script) {
+      document.getElementById('codeContent').innerHTML = `
+        <pre class="mb-0"><code class="language-python">${data.script}</code></pre>
+      `;
+    }
+    
+    // Argv tab
+    if (data.argv && data.argv.length > 0) {
+      populateArgvTab(data.argv);
+    }
+    
+    // Error tab
+    if (data.error) {
+      document.getElementById('errorContent').innerHTML = `
+        <pre><code class="language-python">${data.error}</code></pre>
+      `;
+    }
+    
+    // Result tab
+    if (data.result) {
+      document.getElementById('resultContent').innerHTML = `
+        <pre class="mb-0"><code class="language-python">${data.result}</code></pre>
+      `;
+    }
+    
+    // HTML tab
+    if (data.html_uri) {
+      document.getElementById('htmlContent').innerHTML = `
+        <iframe src="${data.html_uri}"
+                style="width: 100%; height: 100vh; border: none;"
+                sandbox="allow-scripts allow-same-origin"></iframe>
+      `;
+    }
+    
+    // Initialize log state for logs tab
+    if (data.log_streams) {
+      logState = {};
+      for (const streamName of Object.keys(data.log_streams)) {
+        logState[streamName] = { page: 1, nextForwardToken: null, nextBackwardToken: null };
+      }
+      populateLogsTab(data.log_streams);
+    }
+  }
+
+  // Function to populate logs tab
+  function populateLogsTab(logStreams) {
+    const logsAccordion = document.getElementById('logsAccordion');
+    const streamNames = Object.keys(logStreams);
+    
+    logsAccordion.innerHTML = streamNames.map((streamName, index) => `
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="heading-${streamName}">
+          <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${streamName}" aria-expanded="${index === 0 ? 'true' : 'false'}" aria-controls="collapse-${streamName}">
+            ${streamName}
+          </button>
+        </h2>
+        <div id="collapse-${streamName}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" aria-labelledby="heading-${streamName}" data-bs-parent="#logsAccordion">
+          <div class="accordion-body">
+            <div class="log-container" id="${streamName}-log-container">
+              <div class="log-content" id="${streamName}-log-content">
+                <div class="text-center">
+                  <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  Loading logs...
+                </div>
+              </div>
+            </div>
+            <div class="log-pagination mt-2">
+              <button class="btn btn-sm btn-outline-primary load-more-logs" data-stream-name="${streamName}" data-direction="backward" disabled>
+                ⬆️ Older logs
+              </button>
+              <span class="text-muted small">Page <span id="${streamName}-log-page">1</span></span>
+              <button class="btn btn-sm btn-outline-primary load-more-logs" data-stream-name="${streamName}" data-direction="forward" disabled>
+                ⬇️ Newer logs
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Helper function to get data type icon
+  function getDataTypeIcon(dataType) {
+    const iconMap = {
+      'list': 'bi-list-ul',
+      'dict': 'bi-collection',
+      'str': 'bi-type',
+      'int': 'bi-123',
+      'float': 'bi-decimal',
+      'bool': 'bi-check-square',
+      'bytes': 'bi-file-binary',
+      'tuple': 'bi-collection',
+      'set': 'bi-diagram-3',
+      'object': 'bi-box'
+    };
+    return iconMap[dataType] || 'bi-file';
+  }
+
+  // Helper function to get node type icon
+  function getNodeTypeIcon(nodeType) {
+    const iconMap = {
+      'fn': 'bi-gear',
+      'import': 'bi-box-arrow-in-down',
+      'literal': 'bi-file-text',
+      'argv': 'bi-terminal'
+    };
+    return iconMap[nodeType] || 'bi-circle';
+  }
+
+  // Helper function to escape HTML
+  function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Function to populate argv tab
+  function populateArgvTab(argvData) {
+    const argvContent = document.getElementById('argvContent');
+    
+    if (!argvData || argvData.length === 0) {
+      argvContent.innerHTML = `
+        <div class="text-center p-4 text-muted">
+          <i class="bi bi-info-circle fs-3"></i>
+          <p class="mt-2">No arguments found for this DAG</p>
+        </div>
+      `;
+      return;
+    }
+    
+    // Create a grid of cards for each argv node
+    const argvCards = argvData.map((node, index) => {
+      const dataTypeIcon = getDataTypeIcon(node.data_type);
+      const nodeTypeIcon = getNodeTypeIcon(node.node_type);
+      
+      return `
+        <div class="col-md-6 col-lg-4 mb-3">
+          <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span class="badge bg-primary">${index + 1}</span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary">
+                  <i class="${nodeTypeIcon}"></i> ${node.node_type}
+                </span>
+                ${node.data_type ? `<span class="badge bg-info">
+                  <i class="${dataTypeIcon}"></i> ${node.data_type}
+                </span>` : ''}
+              </div>
+            </div>
+            <div class="card-body">
+              ${node.name ? `<h6 class="card-title">${escapeHtml(node.name)}</h6>` : ''}
+              
+              <dl class="row small mb-2">
+                <dt class="col-sm-4">Node ID:</dt>
+                <dd class="col-sm-8"><code class="small">${node.id || 'N/A'}</code></dd>
+                
+                ${node.datum_id ? `
+                <dt class="col-sm-4">Datum ID:</dt>
+                <dd class="col-sm-8"><code class="small">${node.datum_id}</code></dd>
+                ` : ''}
+                
+                ${node.length !== null && node.length !== undefined ? `
+                <dt class="col-sm-4">Length:</dt>
+                <dd class="col-sm-8">${node.length}</dd>
+                ` : ''}
+                
+                ${node.keys && node.keys.length > 0 ? `
+                <dt class="col-sm-4">Keys:</dt>
+                <dd class="col-sm-8">
+                  ${node.keys.map(key => `<span class="badge bg-light text-dark me-1">${escapeHtml(key)}</span>`).join('')}
+                </dd>
+                ` : ''}
+              </dl>
+              
+              ${node.doc ? `
+              <div class="mb-2">
+                <small class="text-muted">Documentation:</small>
+                <p class="small">${escapeHtml(node.doc)}</p>
+              </div>
+              ` : ''}
+            </div>
+            <div class="card-footer">
+              <a href="${node.link}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-arrow-right-circle"></i> View Node
+              </a>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    argvContent.innerHTML = `
+      <div class="row">
+        ${argvCards}
+      </div>
+    `;
+  }
+
+  // Function to show error message
+  function showError(message) {
+    const statsGrid = document.getElementById('dagStatsGrid');
+    statsGrid.innerHTML = `
+      <div class="dag-stat-item" style="background-color: #f8d7da; border-color: #f5c6cb;">
+        <div class="dag-stat-value" style="color: #721c24;">
+          <i class="bi bi-exclamation-triangle"></i>
+        </div>
+        <div class="dag-stat-label" style="color: #721c24;">Error</div>
+      </div>
+    `;
+  }
+
+  // Initialize cytoscape graph
+  function initializeCytoscape(data) {
+    console.log('DEBUG: initializeCytoscape called with data:', data);
+    
+    if (!data || !data.dag_data) {
+      console.log('DEBUG: No dag_data available, skipping cytoscape initialization');
+      return;
+    }
+    
+    console.log('DEBUG: Setting global variables...');
+    graphData = data.dag_data;
+    dagData = data;
+    
+    console.log('DEBUG: graphData set to:', graphData);
+    console.log('DEBUG: Calling initCytoscape...');
+    
+    // Initialize cytoscape graph
+    initCytoscape();
+    
+    console.log('DEBUG: Calling populateNodeTable...');
+    // Populate the node table
+    populateNodeTable(data);
+    
+    console.log('DEBUG: initializeCytoscape complete');
+  }
+
+  // Main initialization function
+  async function initializePage() {
+    try {
+      console.log('DEBUG: Starting page initialization');
+      console.log('DEBUG: dagId =', dagId, 'repo =', repo, 'branch =', branch, 'prune =', prune);
+      
+      const data = await loadDAGData();
+      console.log('DEBUG: loadDAGData returned:', data);
+      
+      if (data) {
+        console.log('DEBUG: Populating UI components...');
+        populateDAGStats(data);
+        updateTabVisibility(data);
+        populateTabContent(data);
+        initializeCytoscape(data);
+        
+        // Highlight code after content is populated
+        if (typeof hljs !== 'undefined') {
+          hljs.highlightAll();
+        }
+        console.log('DEBUG: Page initialization complete');
+      } else {
+        console.log('DEBUG: No data received, skipping UI population');
+      }
+    } catch (error) {
+      console.error('DEBUG: Error initializing page:', error);
+      showError('Failed to initialize page: ' + error.message);
+    }
+  }
+
+  // Function to refresh DAG data with new prune setting
+  async function refreshDAGData(pruneNodes) {
+    try {
+      // Show loading states
+      showLoadingStates();
+      
+      console.log(`Refreshing DAG data with prune=${pruneNodes}`);
+      const data = await loadDAGData(pruneNodes);
+      
+      if (data) {
+        // Update all UI components with new data
+        populateDAGStats(data);
+        updateTabVisibility(data);
+        populateTabContent(data);
+        initializeCytoscape(data);
+        
+        // Highlight code after content is updated
+        if (typeof hljs !== 'undefined') {
+          hljs.highlightAll();
+        }
+        
+        console.log('DAG data refreshed successfully');
+      }
+    } catch (error) {
+      console.error('Error refreshing DAG data:', error);
+      showError('Failed to refresh DAG data: ' + error.message);
+    }
+  }
+
+  // Function to show loading states during refresh
+  function showLoadingStates() {
+    // Show loading in stats
+    const statsGrid = document.getElementById('dagStatsGrid');
+    if (statsGrid) {
+      statsGrid.innerHTML = `
+        <div class="dag-stat-item">
+          <div class="dag-stat-value">
+            <div class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem;">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+          <div class="dag-stat-label">Refreshing...</div>
+        </div>
+      `;
+    }
+    
+    // Show loading in cytoscape container
+    const cyContainer = document.getElementById('cy');
+    if (cyContainer) {
+      cyContainer.innerHTML = `
+        <div class="text-center p-4">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading graph...</span>
+          </div>
+          <p class="mt-2 text-muted">Refreshing DAG visualization...</p>
+        </div>
+      `;
+    }
+    
+    // Show loading in table
+    const tableBody = document.getElementById('nodeTable');
+    if (tableBody) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="6" class="text-center p-3">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            Refreshing node data...
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  // Start loading data when DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    initializePage();
+    
+    // Initialize tooltips for static elements
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(tooltipTriggerEl => {
+      new bootstrap.Tooltip(tooltipTriggerEl);
     });
     
     // Enhanced stats functionality
     const statsContainer = document.querySelector('.dag-stats-container');
     if (statsContainer) {
-      // Add click handlers for clickable stats
-      const clickableStats = statsContainer.querySelectorAll('.dag-stat-item.clickable');
-      clickableStats.forEach(function(statItem) {
-        statItem.addEventListener('click', function() {
-          // For now, just trigger the tooltip to show
-          const tooltip = bootstrap.Tooltip.getInstance(this);
-          if (tooltip) {
-            tooltip.show();
-            setTimeout(() => tooltip.hide(), 3000);
-          }
-        });
+      // Add subtle animation on hover
+      statsContainer.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-2px)';
       });
       
-      // Smooth reveal animation for stats
-      const statItems = statsContainer.querySelectorAll('.dag-stat-item');
-      statItems.forEach(function(item, index) {
-        item.style.opacity = '0';
-        item.style.transform = 'translateY(10px)';
-        setTimeout(function() {
-          item.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-          item.style.opacity = '1';
-          item.style.transform = 'translateY(0)';
-        }, index * 50);
+      statsContainer.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0)';
       });
     }
   });
 </script>
 <script>
-  const nodeTable = document.querySelector("#nodeTable");
-  graphData.nodes
-    .sort((a, b) => ((a.name || "") > (b.name || "") ? 1 : -1))
-    .forEach((node, index) => {
-      let parent = "";
-      if (node.parent) {
-        parent = `<a href=${node.parent_link}>${node.parent}</a>`;
-      }
-      let node_type = node.node_type;
-      if (node.sublist) {
-        let inner = node.sublist
-          .map((subnode, index) => {
-            return `<li><a href="${subnode[1]}" class="dropdown-item">${subnode[0].substring(0, 8)}</a></li>`
-          })
-          .reduce(function(a, b){ return a + b });
-        node_type = `
-          <div class="dropdown">
-            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-              ${node_type}
-            </button>
-            <ul class="dropdown-menu">
-              ${inner}
-            </ul>
-          </div>
-        `
-      }
-      nodeTable.innerHTML += `
-        <tr data-node-id="${node.id}" ${node.id == graphData.result? 'class="border border-primary"' : ""}>
-          <td><a href=${node.link}>${node.id.substring(0, 8)}</a></td>
-          <td>${node.name || ""}</td>
-          <td>${parent}</td>
-          <td>${node_type}</td>
-          <td>${node.data_type}</td>
-          <td>${node.doc || ""}</td>
-        </tr>
-      `;
-    });
-
-  document.addEventListener("DOMContentLoaded", function(){
-    initCytoscape();
-    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]')
-    const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl))
-  });
-
+  // Function to initialize cytoscape after data is loaded
   function initCytoscape() {
-    var _style = window.getComputedStyle(document.body)
+    console.log('DEBUG: initCytoscape called');
+    console.log('DEBUG: graphData available:', !!graphData);
+    
+    if (!graphData) {
+      console.log('DEBUG: No graph data available yet');
+      return;
+    }
+    
+    try {
+      console.log('DEBUG: Initializing cytoscape with data:', graphData);
+
+      // Check if cytoscape is available
+      if (typeof cytoscape === 'undefined') {
+        console.error('DEBUG: Cytoscape library not loaded!');
+        return;
+      }
+
+    var _style = window.getComputedStyle(document.body);
     const color_map = {
       argv: _style.getPropertyValue("--bs-warning-text-emphasis"),
       literal: _style.getPropertyValue("--bs-primary"),
       fn: _style.getPropertyValue("--bs-secondary"),
       import: _style.getPropertyValue("--bs-danger"),
     };
+
+    console.log('Color map:', color_map);
 
     const cyNodes = graphData.nodes.map((node) => ({
       data: {
@@ -671,6 +1233,7 @@
         doc: node.doc,
       },
     }));
+    
     const cyEdges = graphData.edges
       .filter((x) => x.type === "node")
       .map((edge) => ({
@@ -680,7 +1243,19 @@
         },
       }));
 
+    console.log('Cytoscape nodes:', cyNodes);
+    console.log('Cytoscape edges:', cyEdges);
+
     const cyContainer = document.querySelector("#cy");
+    console.log('Cytoscape container:', cyContainer);
+    
+    if (!cyContainer) {
+      console.error('Cytoscape container not found!');
+      return;
+    }
+
+    // Clear the container before initializing cytoscape
+    cyContainer.innerHTML = '';
     const cy = cytoscape({
       container: cyContainer,
       elements: {
@@ -725,7 +1300,8 @@
         padding: 50,
       },
     });
-    /* cy.cssVars();*/
+
+    console.log('Cytoscape instance created:', cy);
 
     // Add zoom and reset controls
     document.getElementById('cy-zoom-in').onclick = function() {
@@ -738,18 +1314,20 @@
       cy.fit();
     };
 
+    // Update legend
     const legendTable = document.querySelector("#cy-legend");
-    legendTable.innerHTML = `<h3 style="margin-top: 0">Color</h3>`
+    legendTable.innerHTML = `<h3 style="margin-top: 0">Color</h3>`;
     Object.entries(color_map).forEach(([a, b]) => {
       const row = document.createElement("div");
       const c = a.charAt(0).toUpperCase() + a.slice(1);
-      row.classList.add("legend-item")
+      row.classList.add("legend-item");
       row.innerHTML = `
         <div class="legend-color" style="border-color: ${b}; background-color: ${b}"></div>
         <span>${c}</span>
-      `
+      `;
       legendTable.appendChild(row);
     });
+    
     legendTable.innerHTML += `
       <h3>Shape</h3>
       <div class="legend-item">
@@ -760,7 +1338,24 @@
         <div class="legend-shape" style="border-radius: 50%"></div>
         <span>Result</span>
       </div>
-    `
+    `;
+    } catch (error) {
+      console.error('Error initializing cytoscape:', error);
+    }
+  }
+
+  // Update the initializeCytoscape function to call the actual cytoscape init
+  function initializeCytoscape(data) {
+    if (!data || !data.dag_data) return;
+    
+    graphData = data.dag_data;
+    dagData = data;
+    
+    // Initialize cytoscape graph
+    initCytoscape();
+    
+    // Populate the node table
+    populateNodeTable(data);
   }
 </script>
 <script>
@@ -970,28 +1565,52 @@
     if (filterSwitch) {
       const container = filterSwitch.closest('.filter-nodes-container');
       
-      // Set initial state based on checkbox checked attribute
+      // Set initial state based on URL prune parameter
+      filterSwitch.checked = prune; // When prune=true, checkbox is checked
+      
+      // Set initial visual state
       if (filterSwitch.checked) {
         container.style.opacity = '1';
-        console.log('Filter nodes enabled (default)');
-        // TODO: Implement initial filter state here
       } else {
-        container.style.opacity = '0.7';
+        container.style.opacity = '0.8';
       }
       
-      filterSwitch.addEventListener('change', function() {
+      filterSwitch.addEventListener('change', async function() {
         const isChecked = this.checked;
+        const shouldPrune = isChecked; // When checked, prune nodes
         
-        // Add visual feedback
-        if (isChecked) {
-          container.style.opacity = '1';
-          // Placeholder for filter functionality
-          console.log('Filter nodes enabled');
-          // TODO: Implement actual node filtering logic here
-        } else {
-          container.style.opacity = '0.7';
-          console.log('Filter nodes disabled');
-          // TODO: Reset node visibility here
+        // Disable the switch during refresh to prevent multiple requests
+        this.disabled = true;
+        container.style.opacity = '0.6';
+        
+        try {
+          // Update visual feedback
+          if (isChecked) {
+            console.log('Prune enabled - showing filtered nodes');
+          } else {
+            console.log('Prune disabled - showing all nodes');
+          }
+          
+          // Refresh DAG data with new prune setting
+          await refreshDAGData(shouldPrune);
+          
+          // Update URL to reflect current state
+          const url = new URL(window.location);
+          if (shouldPrune) {
+            url.searchParams.delete('prune'); // Default is pruned, so remove param
+          } else {
+            url.searchParams.set('prune', 'false');
+          }
+          window.history.replaceState({}, '', url);
+          
+        } catch (error) {
+          console.error('Error updating filter:', error);
+          // Revert checkbox state on error
+          this.checked = !isChecked;
+        } finally {
+          // Re-enable the switch and restore opacity
+          this.disabled = false;
+          container.style.opacity = isChecked ? '1' : '0.8';
         }
       });
     }

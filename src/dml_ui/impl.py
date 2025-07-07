@@ -157,42 +157,23 @@ def dag_route():
     repo = request.args.get("repo")
     branch = request.args.get("branch")
     dag_id = request.args.get("dag_id")
+    
+    if not dag_id:
+        return "DAG ID is required", 400
+    
     dml = Dml(repo=repo, branch=branch)
-    data = get_dag_info(dml, dag_id)
-    data.pop("argv", None)
-    # data.update(data.pop("result", {}))
-    log_streams = data.pop("log_streams", {})
-    dag_data = data.pop("dag_data")
     
-    # Generate breadcrumbs and sidebar data
-    breadcrumbs = get_breadcrumbs(dml, repo, branch, dag_id, dag_data)
-    sidebar = get_sidebar_data(dml, repo, branch, dag_id, dag_data)
+    # Generate breadcrumbs and sidebar data (these are needed for navigation)
+    breadcrumbs = get_breadcrumbs(dml, repo, branch, dag_id, None)
+    sidebar = get_sidebar_data(dml, repo, branch, dag_id, None)
     
-    for node in dag_data["nodes"]:
-        node["link"] = url_for(
-            "node_route",
-            repo=repo,
-            branch=branch,
-            dag_id=dag_id,
-            node_id=node["id"] or "",
-        )
-        if node["node_type"] in ["import", "fn"]:
-            node["parent_link"] = url_for("dag_route", repo=repo, branch=branch, dag_id=node["parent"])
-            if node["node_type"] == "fn":
-                node["sublist"] = [
-                    [
-                        x,
-                        url_for(
-                            "node_route",
-                            repo=repo,
-                            branch=branch,
-                            dag_id=dag_id,
-                            node_id=x,
-                        ),
-                    ]
-                    for x in node["sublist"]
-                ]
-    return render_template("dag.html", data=dag_data, log_streams=log_streams, breadcrumbs=breadcrumbs, sidebar=sidebar, **data)
+    # Pass minimal data to template - everything else will be loaded dynamically
+    return render_template("dag.html", 
+                         repo=repo, 
+                         branch=branch, 
+                         dag_id=dag_id,
+                         breadcrumbs=breadcrumbs, 
+                         sidebar=sidebar)
 
 @app.route("/node")
 def node_route():
@@ -491,6 +472,118 @@ def kill_idx():
         idx["dag_link"] = url_for("dag_route", repo=repo, branch=branch, dag_id=idx["dag"])
     return jsonify({"deleted": len(body), "indexes": idxs})
 
+
+@app.route("/api/dag", methods=["GET"])
+def api_dag_data():
+    """
+    API endpoint to get DAG data dynamically.
+    Returns JSON with all DAG information including nodes, edges, stats, etc.
+    """
+    try:
+        repo = request.args.get("repo")
+        branch = request.args.get("branch")
+        dag_id = request.args.get("dag_id")
+        prune = request.args.get("prune", "false").lower() == "true"
+        
+        print(f"DEBUG: API call with repo={repo}, branch={branch}, dag_id={dag_id}, prune={prune}")
+        
+        if not dag_id:
+            print("DEBUG: Missing dag_id parameter")
+            return jsonify({"error": "dag_id parameter is required"}), 400
+        
+        print(f"DEBUG: Creating Dml instance with repo={repo}, branch={branch}")
+        dml = Dml(repo=repo, branch=branch)
+        
+        print(f"DEBUG: Calling get_dag_info with dag_id={dag_id}, prune={prune}")
+        data = get_dag_info(dml, dag_id, prune=prune)
+        print(f"DEBUG: get_dag_info returned data keys: {list(data.keys()) if data else 'None'}")
+        print(f"DEBUG: get_dag_info returned data keys: {list(data.keys()) if data else 'None'}")
+        
+        # Extract components, keeping argv for frontend
+        log_streams = data.pop("log_streams", {})
+        dag_data = data.pop("dag_data")
+        
+        # Get argv data if available and add links to nodes
+        argv_data = []
+        if dag_data.get("argv"):
+            try:
+                argv_node_ids = dag_data["argv"]
+                # Handle both string (single node) and list (multiple nodes) cases
+                if isinstance(argv_node_ids, str):
+                    argv_node_ids = [argv_node_ids]
+                elif isinstance(argv_node_ids, list):
+                    pass  # Already a list
+                else:
+                    print(f"DEBUG: Unexpected argv type: {type(argv_node_ids)}")
+                    argv_node_ids = []
+                
+                for node_id in argv_node_ids:
+                    # Find the corresponding node in the dag_data
+                    node_info = next((node for node in dag_data["nodes"] if node["id"] == node_id), None)
+                    if node_info:
+                        # Add link for navigation
+                        node_with_link = node_info.copy()
+                        node_with_link["link"] = url_for(
+                            "node_route",
+                            repo=repo,
+                            branch=branch,
+                            dag_id=dag_id,
+                            node_id=node_id
+                        )
+                        argv_data.append(node_with_link)
+            except Exception as e:
+                print(f"DEBUG: Error processing argv data: {e}")
+                argv_data = []
+        
+        print(f"DEBUG: dag_data has {len(dag_data.get('nodes', []))} nodes and {len(dag_data.get('edges', []))} edges")
+        print(f"DEBUG: dag_data keys: {list(dag_data.keys()) if dag_data else 'None'}")
+        print(f"DEBUG: dag_data argv value: {dag_data.get('argv')}")
+        print(f"DEBUG: argv_data processed: {argv_data}")
+        print(f"DEBUG: argv_data length: {len(argv_data)}")
+        
+        # Add node links for frontend navigation
+        for node in dag_data["nodes"]:
+            node["link"] = url_for(
+                "node_route",
+                repo=repo,
+                branch=branch,
+                dag_id=dag_id,
+                node_id=node["id"] or "",
+            )
+            if node["node_type"] in ["import", "fn"]:
+                node["parent_link"] = url_for("dag_route", repo=repo, branch=branch, dag_id=node["parent"])
+                if node["node_type"] == "fn":
+                    node["sublist"] = [
+                        [
+                            x,
+                            url_for(
+                                "node_route",
+                                repo=repo,
+                                branch=branch,
+                                dag_id=dag_id,
+                                node_id=x,
+                            ),
+                        ]
+                        for x in node["sublist"]
+                    ]
+        
+        # Prepare response data
+        response_data = {
+            "dag_data": dag_data,
+            "log_streams": log_streams,
+            "argv": argv_data,
+            **data  # Include script, error, result, html_uri etc.
+        }
+        
+        print(f"DEBUG: Returning response with keys: {list(response_data.keys())}")
+        print(f"DEBUG: Response dag_data has {len(response_data['dag_data'].get('nodes', []))} nodes")
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"DEBUG: Exception in api_dag_data: {e}")
+        logger.error(f"Error fetching DAG data: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 def run():
     parser = ArgumentParser()
