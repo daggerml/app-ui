@@ -1,0 +1,506 @@
+{#
+  Node Detail Template
+  
+  This template displays detailed information about a specific node in a DAG.
+  It uses a tabbed interface to organize different types of node data:
+  - Info: Basic node metadata and links
+  - Data: The computed value/result of the node
+  - argv: Individual command-line arguments if this is an argv node
+  - Code: Associated script content if available
+  - Error: Stack trace if the node resulted in an error
+  - HTML: Rendered HTML content if the node produces HTML output
+  - Plugins: Dynamic plugin content for extended node analysis
+  
+  The template expects the following context variables:
+  - dag_data: Dictionary containing DAG metadata
+  - value: Formatted string representation of the node's value
+  - argv_elements: List of argument details for argv nodes (optional)
+  - script: Python script content (optional)
+  - stack_trace: Error stack trace (optional)
+  - html_uri: Pre-signed URL for HTML content (optional)
+  - node_description: Full node description from dml describe command (optional)
+#}
+
+{% extends "layout.html" %}
+
+{% block extra_header %}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/base16/ashes.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
+  
+  <style>
+    /* Code container styling for syntax-highlighted content */
+    .code-container {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .code-container pre {
+      border-radius: 0;
+      max-height: none;
+    }
+    .code-container .card-body {
+      background-color: var(--bs-gray-100);
+    }
+    
+    /* Node information table styling */
+    .node-info-table {
+      margin-bottom: 0;
+    }
+    
+    /* Argument cards styling with hover effects */
+    .argv-card {
+      transition: all 0.2s ease;
+    }
+    
+    .argv-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Argument index badge styling */
+    .argv-index {
+      font-weight: bold;
+      color: var(--bs-primary);
+    }
+    
+    /* Argument value display with monospace font and proper wrapping */
+    .argv-value {
+      font-family: var(--bs-font-monospace);
+      background-color: var(--bs-gray-100);
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    
+    /* Dark theme support for argument values */
+    [data-bs-theme="dark"] .argv-value {
+      background-color: var(--bs-gray-800);
+    }
+    
+    /* Plugin container styling */
+    #plugin-container {
+      min-height: 60vh;
+    }
+    
+    #plugin-container iframe {
+      width: 100%;
+      height: 60vh;
+      border: none;
+    }
+    
+    .plugin-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+    }
+  </style>
+{% endblock %}
+
+{% block title %}Node{% endblock %}
+
+{% block content %}
+  <div class="h-100">
+    <!-- Header -->
+    <div class="d-flex align-items-center mb-3">
+      <h2 class="mb-0">Node</h2>
+    </div>
+    
+    <!-- Tab Navigation
+         Displays tabs for different views of node data. Tabs are conditionally shown
+         based on available data:
+         - Info: Always shown, contains basic node metadata
+         - Data: Always shown, contains the node's computed value
+         - argv: Shown only for argv nodes with argument data
+         - Code: Shown only if script content is available
+         - Stacktrace: Shown only if error occurred
+         - HTML: Shown only if node produces HTML output
+    -->
+    <ul class="nav nav-tabs" id="nodeTab" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab" aria-controls="info" aria-selected="true">Info</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="data-tab" data-bs-toggle="tab" data-bs-target="#data" type="button" role="tab" aria-controls="data" aria-selected="false">Data</button>
+      </li>
+      {% if argv_elements %}
+      <li class="nav-item" role="presentation" id="argv-tab-container">
+        <button class="nav-link" id="argv-tab" data-bs-toggle="tab" data-bs-target="#argv" type="button" role="tab" aria-controls="argv" aria-selected="false">argv</button>
+      </li>
+      {% endif %}
+      {% if script %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code" type="button" role="tab" aria-controls="code" aria-selected="false">Code</button>
+      </li>
+      {% endif %}
+      {% if stack_trace %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="stacktrace-tab" data-bs-toggle="tab" data-bs-target="#stacktrace" type="button" role="tab" aria-controls="stacktrace" aria-selected="false">Stacktrace</button>
+      </li>
+      {% endif %}
+      {% if html_uri %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="html-tab" data-bs-toggle="tab" data-bs-target="#html" type="button" role="tab" aria-controls="html" aria-selected="false">HTML</button>
+      </li>
+      {% endif %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="plugins-tab" data-bs-toggle="tab" data-bs-target="#plugins" type="button" role="tab" aria-controls="plugins" aria-selected="false">Plugins</button>
+      </li>
+    </ul>
+    
+    <!-- Tab Content -->
+    <div class="tab-content mt-3" id="nodeTabContent">
+      <!-- Info Tab -->
+      <div class="tab-pane fade show active" id="info" role="tabpanel" aria-labelledby="info-tab">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-info-circle me-2"></i>
+              Node Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <table class="table table-striped table-bordered node-info-table">
+              <thead>
+                <tr>
+                  <th>Dag</th>
+                  <th>Node</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><a href="{{ dag_link }}">{{ dag_id }}</a></td>
+                  <td>{{ node_id }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Data Tab -->
+      <div class="tab-pane fade" id="data" role="tabpanel" aria-labelledby="data-tab">
+        <div class="card code-container">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-database me-2"></i>
+              Data
+            </h5>
+          </div>
+          <div class="card-body p-0">
+            <pre class="mb-0"><code class="language-python">{{ value }}</code></pre>
+          </div>
+        </div>
+      </div>
+      
+      <!-- argv Tab
+           Displays command-line arguments for argv nodes as individual cards.
+           Each card shows the argument's index, type, and formatted value.
+           Content is rendered server-side when argv data is available.
+      -->
+      {% if argv_elements %}
+      <div class="tab-pane fade" id="argv" role="tabpanel" aria-labelledby="argv-tab">
+        <div class="container-fluid">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-list-ul me-2"></i>
+                argv
+              </h5>
+              <p class="text-muted mb-0 small">Individual argv node details</p>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                {% for element in argv_elements %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card argv-card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                      <span class="badge bg-primary argv-index">argv[{{ element.index }}]</span>
+                      <div class="d-flex align-items-center gap-1">
+                        {% if element.node_type %}
+                        <span class="badge bg-secondary">{{ element.node_type }}</span>
+                        {% endif %}
+                        {% if element.data_type %}
+                        <span class="badge bg-info">{{ element.data_type }}</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      {% if element.doc %}
+                      <div class="mb-3">
+                        <p class="small text-muted mb-0">{{ element.doc }}</p>
+                      </div>
+                      {% endif %}
+                      
+                      <div class="small">
+                        {% if element.id %}
+                        <div class="mb-1">
+                          <strong>ID:</strong> <code class="small">{{ element.id }}</code>
+                        </div>
+                        {% endif %}
+                        
+                        {% if element.length is not none %}
+                        <div class="mb-1">
+                          <strong>Length:</strong> {{ element.length }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if element.dict_keys %}
+                        <div class="mb-1">
+                          <strong>Keys:</strong>
+                          <div class="mt-1">
+                            {% for key in element.dict_keys %}
+                            <span class="badge bg-light text-dark me-1">{{ key }}</span>
+                            {% endfor %}
+                          </div>
+                        </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                    {% if element.id %}
+                    <div class="card-footer">
+                      <a href="{{ url_for('node_route', repo=request.args.get('repo'), branch=request.args.get('branch'), dag_id=dag_id, node_id=element.id) }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-right-circle"></i> View Node
+                      </a>
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Code Tab -->
+      {% if script %}
+      <div class="tab-pane fade" id="code" role="tabpanel" aria-labelledby="code-tab">
+        <div class="card code-container">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-code-slash me-2"></i>
+              Code
+            </h5>
+          </div>
+          <div class="card-body p-0">
+            <pre class="mb-0"><code class="language-python">{{ script }}</code></pre>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Stacktrace Tab -->
+      {% if stack_trace %}
+      <div class="tab-pane fade" id="stacktrace" role="tabpanel" aria-labelledby="stacktrace-tab">
+        <div class="card code-container">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              Stacktrace
+            </h5>
+          </div>
+          <div class="card-body p-0">
+            <pre class="mb-0"><code class="language-python">{{ stack_trace }}</code></pre>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- HTML Tab -->
+      {% if html_uri %}
+      <div class="tab-pane fade" id="html" role="tabpanel" aria-labelledby="html-tab">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-filetype-html me-2"></i>
+              HTML
+            </h5>
+          </div>
+          <div class="card-body p-0">
+            <iframe src="{{ html_uri }}"
+                    style="width: 100%; height: 100vh; border: none;" 
+                    sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Plugins Tab -->
+      <div class="tab-pane fade" id="plugins" role="tabpanel" aria-labelledby="plugins-tab">
+        <div class="container-fluid">
+          <div class="card">
+            <div class="card-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                  <i class="bi bi-plugin me-2"></i>
+                  Plugins
+                </h5>
+                <div class="dropdown">
+                  <button class="btn btn-outline-primary dropdown-toggle" type="button" id="plugin-selector" data-bs-toggle="dropdown" aria-expanded="false">
+                    Select Plugin
+                  </button>
+                  <ul class="dropdown-menu" id="plugin-dropdown" aria-labelledby="plugin-selector">
+                    <li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="card-body p-0">
+              <div id="plugin-container" style="width: 100%; min-height: 60vh; border: none; background-color: #f8f9fa;">
+                <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                  <div class="text-center">
+                    <i class="bi bi-plugin fs-1 mb-3"></i>
+                    <p>Select a plugin from the dropdown above to display its content</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    /**
+     * Node plugin functionality
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      const pluginDropdown = document.getElementById('plugin-dropdown');
+      const pluginSelector = document.getElementById('plugin-selector');
+      const pluginContainer = document.getElementById('plugin-container');
+      
+      // Load available plugins when plugins tab is first clicked
+      document.getElementById('plugins-tab').addEventListener('click', function() {
+        if (!this.dataset.pluginsLoaded) {
+          loadPlugins();
+          this.dataset.pluginsLoaded = 'true';
+        }
+      });
+      
+      function loadPlugins() {
+        pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>';
+        
+        // Fetch available node plugins from backend
+        fetch('/api/node/plugins')
+          .then(response => response.json())
+          .then(plugins => {
+            if (plugins && plugins.length > 0) {
+              pluginDropdown.innerHTML = plugins.map(plugin => 
+                `<li><a class="dropdown-item" href="#" data-plugin-id="${plugin.id}">${plugin.name}</a></li>`
+              ).join('');
+              
+              // Add click event listeners to plugin options
+              pluginDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                  e.preventDefault();
+                  const pluginId = this.dataset.pluginId;
+                  const pluginName = this.textContent;
+                  loadPlugin(pluginId, pluginName);
+                });
+              });
+            } else {
+              pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">No plugins available</span></li>';
+            }
+          })
+          .catch(error => {
+            console.error('Error loading plugins:', error);
+            pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-danger">Error loading plugins</span></li>';
+          });
+      }
+      
+      function loadPlugin(pluginId, pluginName) {
+        // Update dropdown button text
+        pluginSelector.innerHTML = pluginName + ' <span class="caret"></span>';
+        
+        // Show loading state
+        showPluginLoading();
+        
+        // Get current parameters from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const dagId = urlParams.get('dag_id');
+        const nodeId = urlParams.get('node_id');
+        const repo = urlParams.get('repo');
+        const branch = urlParams.get('branch');
+        
+        // Build plugin URL with all necessary parameters
+        let pluginUrl = `/api/node/plugins/${encodeURIComponent(pluginId)}?dag_id=${encodeURIComponent(dagId)}&node_id=${encodeURIComponent(nodeId)}`;
+        if (repo) {
+          pluginUrl += `&repo=${encodeURIComponent(repo)}`;
+        }
+        if (branch) {
+          pluginUrl += `&branch=${encodeURIComponent(branch)}`;
+        }
+        
+        // Fetch plugin content
+        fetch(pluginUrl)
+          .then(response => response.text())
+          .then(html => {
+            // Create isolated iframe for plugin content
+            const iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.height = '60vh';
+            iframe.style.border = 'none';
+            iframe.sandbox = 'allow-scripts allow-same-origin allow-forms';
+            
+            // Clear container and add iframe
+            pluginContainer.innerHTML = '';
+            pluginContainer.appendChild(iframe);
+            
+            // Write plugin content to iframe
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(html);
+            iframe.contentDocument.close();
+          })
+          .catch(error => {
+            console.error('Error loading plugin:', error);
+            showPluginError('Failed to load plugin content');
+          });
+      }
+      
+      function showPluginLoading() {
+        pluginContainer.innerHTML = `
+          <div class="d-flex align-items-center justify-content-center h-100">
+            <div class="text-center">
+              <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="text-muted">Loading plugin...</p>
+            </div>
+          </div>
+        `;
+      }
+      
+      function showPluginError(message) {
+        pluginContainer.innerHTML = `
+          <div class="d-flex align-items-center justify-content-center h-100">
+            <div class="text-center">
+              <i class="bi bi-exclamation-triangle text-danger fs-1 mb-3"></i>
+              <p class="text-danger">${message}</p>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    /**
+     * Escapes HTML characters to prevent XSS and ensure proper display.
+     * 
+     * @param {string|null|undefined} text - The text to escape
+     * @returns {string} HTML-escaped text or empty string if input is null/undefined
+     */
+    function escapeHtml(text) {
+      if (text === null || text === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      hljs.highlightAll();
+    });
+  </script>
+{% endblock %}

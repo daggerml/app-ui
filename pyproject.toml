@@ -1,0 +1,102 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dml-ui"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Aaron Niskin", email = "aaron@niskin.org" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "daggerml",
+  "dml-util>=0.0.16",
+  "flask==3.1.1",
+  "matplotlib>=3.4.0",
+  "seaborn>=0.11.0",
+  "plotly==6.2.0",
+  "altair>=5.5.0",
+  "vegafusion>=2.0.2",
+  "bokeh>=3.7.3",
+  "pandas>=2.0.0",
+  "polars>=1.0.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/daggerml/dml-ui#readme"
+Issues = "https://github.com/daggerml/dml-ui/issues"
+Source = "https://github.com/daggerml/dml-ui"
+
+# script entry points
+[project.scripts]
+dml-ui-dev = "dml_ui.impl:run"
+
+[project.entry-points."dml_ui.dashboard.dag"]
+example_dag_plugin = "dml_ui.plugins:ExampleDagPlugin"
+dag_stats_plugin = "dml_ui.plugins:DagStatsPlugin"
+
+[project.entry-points."dml_ui.dashboard.node"]
+example_node_plugin = "dml_ui.plugins:ExampleNodePlugin"
+node_details_plugin = "dml_ui.plugins:NodeDetailsPlugin"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "only-version"   # use tag as version
+local_scheme = "no-local-version"  # pypi does not support local-schemes
+tag_regex = "^v(?P<version>[0-9.]+)$"
+version_file = "src/dml_ui/__about__.py"  # write version info to this file
+relative_to = "{root:uri}"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dml_ui"]
+artifacts = [
+  "src/dml_ui/__about__.py"  # add to hatch build because it's git ignored
+]
+
+[tool.hatch.envs.default]
+extra-dependencies = [
+  "mypy>=1.0.0",
+  # github dependencies on branch: "main" with features: dml,nb,app,test
+  "dml-util[nb,test] @ git+https://github.com/daggerml/dml-util.git@simplify-tests",
+  "daggerml @ git+https://github.com/daggerml/daggerml.git@fixed-annoying-keys-issue",
+  "daggerml_cli @ git+https://github.com/daggerml/daggerml-cli.git@fixed-annoying-keys-issue",
+]
+[tool.hatch.envs.default.scripts]
+check = "mypy --install-types --non-interactive {args:src/dml_ui tests}"
+
+[tool.coverage.run]
+source_pkgs = ["dml_ui", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/dml_ui/__about__.py",
+]
+
+[tool.coverage.paths]
+dml_ui = ["src/dml_ui", "*/dml-ui/src/dml_ui"]
+tests = ["tests", "*/dml-ui/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
