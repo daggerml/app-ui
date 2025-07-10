@@ -1,65 +1,54 @@
 import logging
-import importlib
-import sys
 from argparse import ArgumentParser
 
 from daggerml import Dml
 from flask import Flask, jsonify, render_template, request, url_for
 
 from dml_ui.cloudwatch import CloudWatchLogs
-from dml_ui.plugins import discover_dag_plugins, discover_node_plugins
+from dml_ui.plugins import discover_dashboard_plugins
 from dml_ui.util import get_dag_info, get_node_info
 
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
-def get_breadcrumbs(repo, branch, dag_id, dag_data=None, commit_id=None):
+def get_breadcrumbs(repo, branch, dag_id=None, commit_id=None):
     """Generate breadcrumb navigation data"""
     breadcrumbs = []
-    # Home breadcrumb
-    breadcrumbs.append({
-        "name": "Home",
-        "url": url_for("main"),
-        "icon": "bi-house"
-    })
+    breadcrumbs.append({"name": "dml", "url": url_for("main"), "icon": "bi-coin"})
     if repo:
-        # Repo breadcrumb
         breadcrumbs.append({
             "name": repo,
             "url": url_for("main", repo=repo),
-            "icon": "bi-folder"
+            "icon": "bi-database",
         })
         if branch:
-            # Branch breadcrumb
             breadcrumbs.append({
                 "name": branch,
                 "url": url_for("main", repo=repo, branch=branch),
                 "icon": "bi-git"
             })
             if commit_id:
-                # Commit breadcrumb
                 breadcrumbs.append({
-                    "name": commit_id[:8],
+                    "name": commit_id.split("/")[-1][:8],
                     "url": url_for("commit_route", repo=repo, branch=branch, commit_id=commit_id),
-                    "icon": "bi-clock-history"
+                    "icon": "bi-umbrella"
                 })
-            if dag_id and dag_data:
+            if dag_id:
                 breadcrumbs.append({
-                    "name": dag_id[:8],
+                    "name": dag_id[0] + ":" + dag_id.split("/")[-1][:8],
                     "url": url_for("dag_route", repo=repo, branch=branch, dag_id=dag_id),
-                    "icon": "bi-diagram-3",
+                    "icon": "bi-asterisk",
                 })
     return breadcrumbs
 
-def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
+def get_sidebar_data(dml, repo, branch, dag_id=None):
     """Generate sidebar navigation data with all sections"""
     sidebar = {
         "title": "Navigation", 
         "sections": [],
         "current": {"repo": repo, "branch": branch, "dag_id": dag_id}
     }
-    
     # Always show repositories section
     repo_section = {"title": "Repositories", "type": "repos", "items": [], "collapsed": bool(repo)}
     try:
@@ -69,7 +58,7 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
             repo_section["items"].append({
                 "name": repo_item["name"],
                 "url": url_for("main", repo=repo_item["name"]),
-                "icon": "bi-folder2" if is_current else "bi-folder",
+                "icon": "bi-database-fill-gear",
                 "type": "repo",
                 "active": is_current
             })
@@ -82,7 +71,6 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
             'type': 'error'
         })
     sidebar["sections"].append(repo_section)
-    
     # Show branches section if repo is selected
     if repo:
         branch_section = {"title": "Branches", "type": "branches", "items": [], "collapsed": bool(branch)}
@@ -106,7 +94,6 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
                 'type': 'error'
             })
         sidebar["sections"].append(branch_section)
-    
     # Show DAGs section if branch is selected
     if repo and branch:
         dag_section = {"title": "DAGs", "type": "dags", "items": [], "collapsed": bool(dag_id)}
@@ -117,11 +104,9 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
                 is_current = dag_id == dag_item["id"]
                 dag_section['items'].append({
                     'name': dag_name,
-                    'display_name': f"{dag_name}" if dag_item.get("name") else dag_item["id"][:8],
                     'url': url_for('dag_route', repo=repo, branch=branch, dag_id=dag_item["id"]),
                     'icon': 'bi-diagram-3',
                     'type': 'dag',
-                    'dag_id': dag_item["id"],
                     'active': is_current
                 })
         except Exception as e:
@@ -133,7 +118,6 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
                 'type': 'error'
             })
         sidebar["sections"].append(dag_section)
-    
     return sidebar
 
 
@@ -142,9 +126,7 @@ def commit_route():
     repo = request.args.get("repo")
     branch = request.args.get("branch")
     commit_id = request.args.get("commit_id")
-    
     dml = Dml(repo=repo, branch=branch)
-    
     # Get commit data
     try:
         if commit_id:
@@ -156,11 +138,9 @@ def commit_route():
     except Exception as e:
         logger.error(f"Failed to get commit data: {e}")
         commit_data = None
-    
     # Generate breadcrumbs and sidebar
-    breadcrumbs = get_breadcrumbs(repo, branch, None, None, commit_id)
-    sidebar = get_sidebar_data(dml, repo, branch, None, None)
-    
+    breadcrumbs = get_breadcrumbs(repo, branch, commit_id=commit_id)
+    sidebar = get_sidebar_data(dml, repo, branch)
     return render_template(
         "commit.html",
         repo=repo,
@@ -179,8 +159,8 @@ def dag_route():
     if not dag_id:
         return "DAG ID is required", 400
     dml = Dml(repo=repo, branch=branch)
-    breadcrumbs = get_breadcrumbs(repo, branch, dag_id, None, None)
-    sidebar = get_sidebar_data(dml, repo, branch, dag_id, None)
+    breadcrumbs = get_breadcrumbs(repo, branch, dag_id=dag_id)
+    sidebar = get_sidebar_data(dml, repo, branch, dag_id=dag_id)
     return render_template(
         "dag.html",
         repo=repo,
@@ -197,13 +177,11 @@ def node_route():
     dag_id = request.args.get("dag_id")
     node_id = request.args.get("node_id")
     dml = Dml(repo=repo, branch=branch)
-    
     # Get DAG data for breadcrumbs and sidebar
     dag_info = get_dag_info(dml, dag_id)
     dag_data = dag_info.get("dag_data")
-    breadcrumbs = get_breadcrumbs(repo, branch, dag_id, dag_data, None)
-    sidebar = get_sidebar_data(dml, repo, branch, dag_id, dag_data)
-    
+    breadcrumbs = get_breadcrumbs(repo, branch, dag_id=dag_id)
+    sidebar = get_sidebar_data(dml, repo, branch, dag_id=dag_id)
     data = get_node_info(dml, dag_id, node_id)
     return render_template(
         "node.html",
@@ -219,15 +197,13 @@ def node_route():
 def main():
     repo = request.args.get("repo")
     branch = request.args.get("branch")
-    
     # If both repo and branch are selected, redirect to commit page
     if repo and branch:
         from flask import redirect
         return redirect(url_for("commit_route", repo=repo, branch=branch))
-    
     dml = Dml(repo=repo, branch=branch)
-    breadcrumbs = get_breadcrumbs(repo, branch, None, None, None)
-    sidebar = get_sidebar_data(dml, repo, branch, None, None)
+    breadcrumbs = get_breadcrumbs(repo, branch)
+    sidebar = get_sidebar_data(dml, repo, branch)
     return render_template("index.html", breadcrumbs=breadcrumbs, sidebar=sidebar)
 
 @app.route("/logs", methods=["GET"])
@@ -245,11 +221,9 @@ def get_logs():
     stream = request.args.get("stream_name")
     next_token = request.args.get("next_token")
     limit = request.args.get("limit", 100, type=int)
-    
     # Get the dag info to find the log stream details
     dag_info = get_dag_info(dml, dag_id)
     log_streams = dag_info.get("log_streams", {})
-    
     # If the stream name doesn't exist in the log_streams, return an error
     if stream not in log_streams:
         error_response = {
@@ -257,12 +231,10 @@ def get_logs():
             "available_streams": list(log_streams.keys())
         }
         return jsonify(error_response), 404
-    
     # Get the log stream details
     stream_details = log_streams[stream]
     log_group = stream_details["log_group"]
     log_stream = stream_details["log_stream"]
-    
     # Get the logs from CloudWatch
     logger.info(f"Fetching logs for DAG {dag_id}, stream {stream} with limit {limit}")
     cloudwatch_logs = CloudWatchLogs()
@@ -279,28 +251,6 @@ def get_logs():
     logs["log_stream"] = log_stream
     return jsonify(logs)
 
-def reload_plugins():
-    """Reload plugin modules to detect changes"""
-    # Import and reload the plugins module to detect changes
-    import dml_ui.plugins
-    importlib.reload(dml_ui.plugins)
-    
-    # Get all modules related to plugins
-    plugin_modules = []
-    for module_name in list(sys.modules.keys()):
-        if 'plugin' in module_name.lower() or module_name.startswith('dml_ui'):
-            plugin_modules.append(module_name)
-    
-    # Reload the modules
-    for module_name in plugin_modules:
-        if module_name in sys.modules:
-            try:
-                importlib.reload(sys.modules[module_name])
-            except Exception as e:
-                logger.warning(f"Failed to reload module {module_name}: {e}")
-
-# Legacy plugin endpoints removed - use /api/dag/plugins and /api/node/plugins instead
-
 
 @app.route("/api/dag", methods=["GET"])
 def api_dag_data():
@@ -313,17 +263,13 @@ def api_dag_data():
         branch = request.args.get("branch")
         dag_id = request.args.get("dag_id")
         prune = request.args.get("prune", "false").lower() == "true"
-        
         if not dag_id:
             return jsonify({"error": "dag_id parameter is required"}), 400
-        
         dml = Dml(repo=repo, branch=branch)
         data = get_dag_info(dml, dag_id, prune=prune)
-        
         # Extract components, keeping argv for frontend
         log_streams = data.pop("log_streams", {})
         dag_data = data.pop("dag_data")
-        
         # Process argv data for frontend display
         # Use the new argv structure from node descriptions
         argv_data = []
@@ -337,7 +283,6 @@ def api_dag_data():
                     pass  # Already a list
                 else:
                     argv_node_ids = []
-                
                 # For each argv node, get its description to extract argv node descriptions
                 for node_id in argv_node_ids:
                     try:
@@ -376,7 +321,6 @@ def api_dag_data():
             except Exception as e:
                 logger.error(f"Error processing argv data: {e}")
                 argv_data = []
-        
         # Add node links for frontend navigation
         for node in dag_data["nodes"]:
             node["link"] = url_for(
@@ -402,7 +346,6 @@ def api_dag_data():
                         ]
                         for x in node["sublist"]
                     ]
-        
         # Prepare response data
         response_data = {
             "dag_data": dag_data,
@@ -410,81 +353,67 @@ def api_dag_data():
             "argv": argv_data,
             **data  # Include script, error, result, html_uri etc.
         }
-        
         return jsonify(response_data)
-        
     except Exception as e:
         logger.error(f"Error fetching DAG data: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/dag/plugins", methods=["GET"])
-def api_dag_plugins():
+@app.route("/api/<string:kind>/plugins", methods=["GET"])
+def api_plugins(kind):
     """
-    API endpoint to list all available DAG dashboard plugins.
+    API endpoint to list all available dashboard plugins.
     Returns JSON array of plugin metadata.
     """
-    logger.info("Fetching DAG plugins")
+    logger.info(f"Fetching {kind} plugins")
     try:
-        # Reload plugins to detect changes
-        reload_plugins()
-        logger.info("Plugins reloaded successfully")
-
         plugins_list = []
-        for plugin_cls in discover_dag_plugins():
-            logger.info(f"Found DAG plugin: {plugin_cls.NAME}")
+        for _id, plugin_cls in discover_dashboard_plugins(kind).items():
+            logger.info(f"Found plugin: {_id} - {plugin_cls.NAME}")
             plugins_list.append({
-                "id": plugin_cls.NAME,
+                "id": _id,
                 "name": plugin_cls.NAME,
                 "description": plugin_cls.DESCRIPTION or 'No description available',
             })
-        logger.info(f"Total DAG plugins found: {len(plugins_list)}")
+        logger.info(f"Total {kind} plugins found: {len(plugins_list)}")
         return jsonify(plugins_list)
     except Exception as e:
-        logger.error(f"Error loading DAG plugins: {e}")
-        return jsonify({"error": "Failed to load DAG plugins"}), 500
+        logger.error(f"Error loading {kind} plugins: {e}")
+        return jsonify({"error": f"Failed to load {kind} plugins"}), 500
 
-@app.route("/api/dag/plugins/<string:plugin_id>", methods=["GET"])
-def api_dag_plugin_content(plugin_id):
+# @app.route("/api/node/plugins/<string:plugin_id>", methods=["GET"])
+@app.route("/api/<string:kind>/plugins/<string:plugin_id>", methods=["GET"])
+def api_dashboard_content(kind, plugin_id):
     """
-    API endpoint to get DAG plugin content for a specific plugin.
+    API endpoint to get Dashboard content for a specific plugin.
     Returns HTML content that will be embedded in an iframe.
     """
-    logger.info(f"Fetching content for DAG plugin: {plugin_id}")
+    fn = {
+        "dag": lambda dml, args: (dml.load(args.get("dag_id")),),
+        "node": lambda dml, args: (dml.load(args.get("dag_id"))[args.get("node_id")],),
+    }.get(kind)
+    if fn is None:
+        return f"<div style='text-align: center; padding: 50px;'><h3>Invalid kind '{kind}'</h3></div>", 400
     try:
-        # Reload plugins to detect changes
-        reload_plugins()
-        
         # Find the plugin by ID
-        plugins = [x for x in discover_dag_plugins() if x.NAME == plugin_id]
-        if not plugins:
-            return f"<div style='text-align: center; padding: 50px;'><h3>DAG Plugin '{plugin_id}' not found</h3></div>", 404
-        
-        if len(plugins) > 1:
-            return f"<div style='text-align: center; padding: 50px;'><h3>Multiple DAG plugins found with name '{plugin_id}'</h3></div>", 500
-        
-        plugin_cls = plugins[0]
-        
-        # Get DAG data
-        dag_id = request.args.get("dag_id")
-        if not dag_id:
-            return "<div style='text-align: center; padding: 50px;'><h3>No DAG ID provided</h3></div>", 400
-        
+        plugin_cls = discover_dashboard_plugins(kind).get(plugin_id)
+        if not plugin_cls:
+            return f"<div style='text-align: center; padding: 50px;'><h3>{kind.capitalize()} Plugin '{plugin_id}' not found</h3></div>", 404
         repo = request.args.get("repo")
         branch = request.args.get("branch")
         dml = Dml(repo=repo, branch=branch)
-        
-        # Load the actual DAG object
-        dag = dml.load(dag_id)
-        
-        # Initialize and render the plugin with dml instance and loaded dag
-        plugin_instance = plugin_cls(dml, dag)
         try:
+            args = fn(dml, request.args)
+        except Exception as e:
+            logger.error(f"Error getting args for {kind} plugin {plugin_id}: {e}")
+            return f"<div style='text-align: center; padding: 50px;'><h3>{str(e)}</h3></div>", 400
+        try:
+            plugin_instance = plugin_cls(dml, *args)
             rendered_content = plugin_instance.render()
         except Exception as plugin_error:
-            logger.error(f"DAG Plugin {plugin_id} failed to render: {plugin_error}")
+            logger.error(f"{kind.capitalize()} Plugin {plugin_id} failed to render: {plugin_error}")
             rendered_content = f"""
             <div class="alert alert-danger">
-                <h4><i class="bi bi-exclamation-triangle"></i> DAG Plugin Error</h4>
+                <h4><i class="bi bi-exclamation-triangle"></i> {kind.capitalize()} Plugin Error</h4>
                 <p><strong>Plugin:</strong> {plugin_cls.NAME}</p>
                 <p><strong>Error:</strong> {str(plugin_error)}</p>
                 <details class="mt-3">
@@ -493,7 +422,6 @@ def api_dag_plugin_content(plugin_id):
                 </details>
             </div>
             """
-        
         # Wrap content in a complete HTML document for iframe
         html_content = f"""
         <!DOCTYPE html>
@@ -523,124 +451,9 @@ def api_dag_plugin_content(plugin_id):
         </body>
         </html>
         """
-        
         return html_content, 200, {'Content-Type': 'text/html'}
-        
     except Exception as e:
-        logger.error(f"Error rendering DAG plugin {plugin_id}: {e}", exc_info=True)
-        return f"<div class='alert alert-danger'>Error: {str(e)}</div>", 500
-
-@app.route("/api/node/plugins", methods=["GET"])
-def api_node_plugins():
-    """
-    API endpoint to list all available Node dashboard plugins.
-    Returns JSON array of plugin metadata.
-    """
-    try:
-        # Reload plugins to detect changes
-        reload_plugins()
-        
-        plugins_list = []
-        for plugin_cls in discover_node_plugins():
-            plugins_list.append({
-                "id": plugin_cls.NAME,
-                "name": plugin_cls.NAME,
-                "description": getattr(plugin_cls, 'DESCRIPTION', 'No description available')
-            })
-        
-        return jsonify(plugins_list)
-    except Exception as e:
-        logger.error(f"Error loading Node plugins: {e}")
-        return jsonify({"error": "Failed to load Node plugins"}), 500
-
-@app.route("/api/node/plugins/<string:plugin_id>", methods=["GET"])
-def api_node_plugin_content(plugin_id):
-    """
-    API endpoint to get Node plugin content for a specific plugin.
-    Returns HTML content that will be embedded in an iframe.
-    """
-    try:
-        # Reload plugins to detect changes
-        reload_plugins()
-        
-        # Find the plugin by ID
-        plugins = [x for x in discover_node_plugins() if x.NAME == plugin_id]
-        if not plugins:
-            return f"<div style='text-align: center; padding: 50px;'><h3>Node Plugin '{plugin_id}' not found</h3></div>", 404
-        
-        if len(plugins) > 1:
-            return f"<div style='text-align: center; padding: 50px;'><h3>Multiple Node plugins found with name '{plugin_id}'</h3></div>", 500
-        
-        plugin_cls = plugins[0]
-        
-        # Get Node data
-        dag_id = request.args.get("dag_id")
-        node_id = request.args.get("node_id")
-        if not dag_id or not node_id:
-            return "<div style='text-align: center; padding: 50px;'><h3>DAG ID and Node ID are required</h3></div>", 400
-        
-        repo = request.args.get("repo")
-        branch = request.args.get("branch")
-        dml = Dml(repo=repo, branch=branch)
-        
-        # Load the DAG and get the node
-        dag = dml.load(dag_id)
-        node = dag[node_id]
-        
-        # Initialize and render the plugin with dml instance and node
-        plugin_instance = plugin_cls(dml, node)
-        # Set the DAG ID for plugins that need it (like NodeDetailsPlugin)
-        plugin_instance._current_dag_id = dag_id
-        try:
-            rendered_content = plugin_instance.render()
-        except Exception as plugin_error:
-            logger.error(f"Node Plugin {plugin_id} failed to render: {plugin_error}")
-            rendered_content = f"""
-            <div class="alert alert-danger">
-                <h4><i class="bi bi-exclamation-triangle"></i> Node Plugin Error</h4>
-                <p><strong>Plugin:</strong> {plugin_cls.NAME}</p>
-                <p><strong>Error:</strong> {str(plugin_error)}</p>
-                <details class="mt-3">
-                    <summary>Technical Details</summary>
-                    <pre class="mt-2 p-2 bg-light"><code>{repr(plugin_error)}</code></pre>
-                </details>
-            </div>
-            """
-        
-        # Wrap content in a complete HTML document for iframe
-        html_content = f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>{plugin_cls.NAME}</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-            <style>
-                body {{
-                    margin: 0;
-                    padding: 20px;
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                }}
-                .plugin-container {{
-                    max-width: 100%;
-                    overflow-x: auto;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="plugin-container">
-                {rendered_content}
-            </div>
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        </body>
-        </html>
-        """
-        
-        return html_content, 200, {'Content-Type': 'text/html'}
-        
-    except Exception as e:
-        logger.error(f"Error rendering Node plugin {plugin_id}: {e}", exc_info=True)
+        logger.error(f"Error rendering {kind.capitalize()} plugin {plugin_id}: {e}", exc_info=True)
         return f"<div class='alert alert-danger'>Error: {str(e)}</div>", 500
 
 def run():

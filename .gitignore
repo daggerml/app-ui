@@ -1,4 +1,5 @@
 # daggerml
+.envrc
 .dml/
 # scm writes version info now...
 __about__.py

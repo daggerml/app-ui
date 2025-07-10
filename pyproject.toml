@@ -43,17 +43,16 @@ Documentation = "https://github.com/daggerml/dml-ui#readme"
 Issues = "https://github.com/daggerml/dml-ui/issues"
 Source = "https://github.com/daggerml/dml-ui"
 
-# script entry points
-[project.scripts]
-dml-ui-dev = "dml_ui.impl:run"
-
 [project.entry-points."dml_ui.dashboard.dag"]
-example_dag_plugin = "dml_ui.plugins:ExampleDagPlugin"
-dag_stats_plugin = "dml_ui.plugins:DagStatsPlugin"
+dag_stats_plugin = "dml_ui.plugin_examples:DagStatsPlugin"
+example_dag_plugin = "dml_ui.plugin_examples:ExampleDagPlugin"
 
 [project.entry-points."dml_ui.dashboard.node"]
-example_node_plugin = "dml_ui.plugins:ExampleNodePlugin"
-node_details_plugin = "dml_ui.plugins:NodeDetailsPlugin"
+node_details_plugin = "dml_ui.plugin_examples:NodeDetailsPlugin"
+example_node_plugin = "dml_ui.plugin_examples:ExampleNodePlugin"
+
+[project.scripts]
+dml-ui-dev = "dml_ui.impl:run"
 
 [tool.hatch.version]
 source = "vcs"

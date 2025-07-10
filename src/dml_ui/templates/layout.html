@@ -449,7 +449,7 @@
               <div class="sidebar-section-header" onclick="toggleSection('{{ section['type'] }}')">
                 <i class="bi bi-chevron-down sidebar-section-toggle{% if section['collapsed'] %} collapsed{% endif %}" id="toggle-{{ section['type'] }}"></i>
                 {% if section['type'] == 'repos' %}
-                  <i class="bi bi-folder2-open sidebar-section-icon"></i>
+                  <i class="bi bi-database-gear sidebar-section-icon"></i>
                 {% elif section['type'] == 'branches' %}
                   <i class="bi bi-git sidebar-section-icon"></i>
                 {% elif section['type'] == 'dags' %}
@@ -460,43 +460,25 @@
                 <span>{{ section['title'] }}</span>
               </div>
               <div class="sidebar-section-content{% if section['collapsed'] %} collapsed{% endif %}" id="content-{{ section['type'] }}">
-                {% if section['items'] %}
-                  {% for item in section['items'] %}
-                    <div class="sidebar-item {% if item.get('type') == 'error' %}error{% endif %}{% if item.get('active') %} active{% endif %}">
-                      <a href="{{ item.url }}" class="{% if item.get('active') %}active{% endif %}">
-                        <i class="{{ item.icon }}"></i>
-                        <span class="sidebar-item-text">
-                          {% if item.display_name %}
-                            {{ item.display_name }}
-                          {% else %}
-                            {{ item.name }}
-                          {% endif %}
-                        </span>
-                        {% if item.get('type') == 'dag' and item.get('dag_id') %}
-                          <span class="sidebar-item-badge">{{ item.dag_id[:6] }}</span>
-                        {% elif item.get('type') == 'node' and item.get('node_type') %}
-                          <span class="sidebar-item-badge">{{ item.node_type }}</span>
+                {% for item in section['items'] %}
+                  <div class="sidebar-item {% if item.get('type') == 'error' %}error{% endif %}{% if item.get('active') %} active{% endif %}">
+                    <a href="{{ item.url }}" class="{% if item.get('active') %}active{% endif %}">
+                      <i class="{{ item.icon }}"></i>
+                      <span class="sidebar-item-text">
+                        {% if item.display_name %}
+                          {{ item.display_name }}
+                        {% else %}
+                          {{ item.name }}
                         {% endif %}
-                      </a>
-                    </div>
-                  {% endfor %}
-                {% else %}
-                  <div class="sidebar-empty">
-                    {% if section['type'] == 'repos' %}
-                      <i class="bi bi-folder2-open"></i>
-                      <div class="sidebar-empty-text">No repositories found</div>
-                    {% elif section['type'] == 'branches' %}
-                      <i class="bi bi-git"></i>
-                      <div class="sidebar-empty-text">No branches found</div>
-                    {% elif section['type'] == 'dags' %}
-                      <i class="bi bi-diagram-3"></i>
-                      <div class="sidebar-empty-text">No DAGs found</div>
-                    {% else %}
-                      <i class="bi bi-inbox"></i>
-                      <div class="sidebar-empty-text">No items found</div>
-                    {% endif %}
+                      </span>
+                      {% if item.get('type') == 'dag' and item.get('dag_id') %}
+                        <span class="sidebar-item-badge">{{ item.dag_id[:6] }}</span>
+                      {% elif item.get('type') == 'node' and item.get('node_type') %}
+                        <span class="sidebar-item-badge">{{ item.node_type }}</span>
+                      {% endif %}
+                    </a>
                   </div>
-                {% endif %}
+                {% endfor %}
               </div>
             </div>
           {% endfor %}
