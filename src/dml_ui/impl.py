@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
-def get_breadcrumbs(repo, branch, dag_id, dag_data=None):
+def get_breadcrumbs(repo, branch, dag_id, dag_data=None, commit_id=None):
     """Generate breadcrumb navigation data"""
     breadcrumbs = []
     # Home breadcrumb
@@ -37,9 +37,16 @@ def get_breadcrumbs(repo, branch, dag_id, dag_data=None):
                 "url": url_for("main", repo=repo, branch=branch),
                 "icon": "bi-git"
             })
+            if commit_id:
+                # Commit breadcrumb
+                breadcrumbs.append({
+                    "name": commit_id[:8],
+                    "url": url_for("commit_route", repo=repo, branch=branch, commit_id=commit_id),
+                    "icon": "bi-clock-history"
+                })
             if dag_id and dag_data:
                 breadcrumbs.append({
-                    "name": dag_id[:12],
+                    "name": dag_id[:8],
                     "url": url_for("dag_route", repo=repo, branch=branch, dag_id=dag_id),
                     "icon": "bi-diagram-3",
                 })
@@ -130,6 +137,40 @@ def get_sidebar_data(dml, repo, branch, dag_id, dag_data=None):
     return sidebar
 
 
+@app.route("/commit")
+def commit_route():
+    repo = request.args.get("repo")
+    branch = request.args.get("branch")
+    commit_id = request.args.get("commit_id")
+    
+    dml = Dml(repo=repo, branch=branch)
+    
+    # Get commit data
+    try:
+        if commit_id:
+            commit_data = dml("commit", "describe", commit_id)
+        else:
+            # Get current commit (HEAD) if no commit_id specified
+            commit_data = dml("commit", "describe")
+            commit_id = commit_data.get("id") if commit_data else None
+    except Exception as e:
+        logger.error(f"Failed to get commit data: {e}")
+        commit_data = None
+    
+    # Generate breadcrumbs and sidebar
+    breadcrumbs = get_breadcrumbs(repo, branch, None, None, commit_id)
+    sidebar = get_sidebar_data(dml, repo, branch, None, None)
+    
+    return render_template(
+        "commit.html",
+        repo=repo,
+        branch=branch,
+        commit_id=commit_id,
+        commit_data=commit_data,
+        breadcrumbs=breadcrumbs,
+        sidebar=sidebar,
+    )
+
 @app.route("/dag")
 def dag_route():
     repo = request.args.get("repo")
@@ -138,7 +179,7 @@ def dag_route():
     if not dag_id:
         return "DAG ID is required", 400
     dml = Dml(repo=repo, branch=branch)
-    breadcrumbs = get_breadcrumbs(repo, branch, dag_id, None)
+    breadcrumbs = get_breadcrumbs(repo, branch, dag_id, None, None)
     sidebar = get_sidebar_data(dml, repo, branch, dag_id, None)
     return render_template(
         "dag.html",
@@ -160,7 +201,7 @@ def node_route():
     # Get DAG data for breadcrumbs and sidebar
     dag_info = get_dag_info(dml, dag_id)
     dag_data = dag_info.get("dag_data")
-    breadcrumbs = get_breadcrumbs(repo, branch, dag_id, dag_data)
+    breadcrumbs = get_breadcrumbs(repo, branch, dag_id, dag_data, None)
     sidebar = get_sidebar_data(dml, repo, branch, dag_id, dag_data)
     
     data = get_node_info(dml, dag_id, node_id)
@@ -178,8 +219,14 @@ def node_route():
 def main():
     repo = request.args.get("repo")
     branch = request.args.get("branch")
+    
+    # If both repo and branch are selected, redirect to commit page
+    if repo and branch:
+        from flask import redirect
+        return redirect(url_for("commit_route", repo=repo, branch=branch))
+    
     dml = Dml(repo=repo, branch=branch)
-    breadcrumbs = get_breadcrumbs(repo, branch, None, None)
+    breadcrumbs = get_breadcrumbs(repo, branch, None, None, None)
     sidebar = get_sidebar_data(dml, repo, branch, None, None)
     return render_template("index.html", breadcrumbs=breadcrumbs, sidebar=sidebar)
 

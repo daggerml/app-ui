@@ -1080,7 +1080,9 @@
 <div class="h-100">
   <!-- Header Row with DAG Title, Toggle, and Stats -->
   <div class="d-flex align-items-center mb-3 gap-3">
-    <h2 class="mb-0">DAG</h2>
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted fs-5 font-monospace">{{ dag_id }}</span>
+    </div>
     
     <!-- Filter Nodes Checkbox - positioned after DAG title -->
     <div class="form-check form-switch filter-nodes-container">
@@ -1565,24 +1567,13 @@
     
     // Populate metadata
     let metaHtml = '';
-    if (dagData.name || dagData.id) {
-      if (dagData.name) {
-        metaHtml += `
-          <div class="dag-meta-item">
-            <div class="dag-meta-label">Name</div>
-            <div class="dag-meta-value" title="${dagData.name}">${dagData.name}</div>
-          </div>
-        `;
-      }
-      if (dagData.id) {
-        const shortId = dagData.id.length > 12 ? dagData.id.substring(0, 12) + '...' : dagData.id;
-        metaHtml += `
-          <div class="dag-meta-item">
-            <div class="dag-meta-label">ID</div>
-            <div class="dag-meta-value" title="${dagData.id}">${shortId}</div>
-          </div>
-        `;
-      }
+    if (dagData.name) {
+      metaHtml += `
+        <div class="dag-meta-item">
+          <div class="dag-meta-label">Name</div>
+          <div class="dag-meta-value" title="${dagData.name}">${dagData.name}</div>
+        </div>
+      `;
     }
     statsMeta.innerHTML = metaHtml;
     
@@ -1605,14 +1596,14 @@
       .map(node => {
         let parent = "";
         if (node.parent) {
-          parent = `<a href="${node.parent_link || '#'}">${node.parent}</a>`;
+          parent = `<a href="${node.parent_link || '#'}">${node.parent.split('/').slice(-1)[0].substring(0, 8)}</a>`;
         }
         
         let node_type = node.node_type || 'N/A';
         if (node.sublist && node.sublist.length > 0) {
           let inner = node.sublist
             .map((subnode, index) => {
-              return `<li><a href="${subnode[1]}" class="dropdown-item">${subnode[0].substring(0, 8)}</a></li>`
+              return `<li><a href="${subnode[1]}" class="dropdown-item">${subnode[0].split('/').slice(-1)[0].substring(0, 8)}</a></li>`
             })
             .join('');
           node_type = `
@@ -1629,7 +1620,7 @@
         
         return `
           <tr data-node-id="${node.id}" ${node.id == data.dag_data.result ? 'class="border border-primary"' : ""}>
-            <td><a href="${node.link || '#'}">${(node.id || 'N/A').substring(0, 8)}</a></td>
+            <td><a href="${node.link || '#'}">${(node.id || 'N/A').split('/').slice(-1)[0].substring(0, 8)}</a></td>
             <td>${node.name || 'N/A'}</td>
             <td>${parent}</td>
             <td>${node_type}</td>
