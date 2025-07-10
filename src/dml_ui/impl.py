@@ -456,6 +456,11 @@ def api_dashboard_content(kind, plugin_id):
         logger.error(f"Error rendering {kind.capitalize()} plugin {plugin_id}: {e}", exc_info=True)
         return f"<div class='alert alert-danger'>Error: {str(e)}</div>", 500
 
+@app.errorhandler(404)
+def page_not_found(error):
+    """Custom 404 error handler"""
+    return render_template('404.html'), 404
+
 def run():
     parser = ArgumentParser()
     parser.add_argument("-p", "--port", type=int, default=5000)

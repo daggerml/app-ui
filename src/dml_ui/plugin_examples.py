@@ -12,6 +12,8 @@ class ExampleDagPlugin(DagDashboardPlugin):
     def render(self):
         dag_id = self.dag._ref.to if hasattr(self.dag, '_ref') else 'Unknown'
         # Get DAG information
+        from time import sleep
+        sleep(1)  # Simulate a delay for loading data
         dag_nodes = []
         try:
             # Access dag nodes through the dag object

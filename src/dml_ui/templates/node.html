@@ -81,6 +81,7 @@
     /* Plugin container styling */
     #plugin-container {
       min-height: 60vh;
+      background: var(--bs-secondary-bg);
     }
     
     #plugin-container iframe {
@@ -349,7 +350,7 @@
               </div>
             </div>
             <div class="card-body p-0">
-              <div id="plugin-container" style="width: 100%; min-height: 60vh; border: none; background-color: #f8f9fa;">
+              <div id="plugin-container" style="width: 100%; min-height: 60vh; border: none;">
                 <div class="d-flex align-items-center justify-content-center h-100 text-muted">
                   <div class="text-center">
                     <i class="bi bi-plugin fs-1 mb-3"></i>
@@ -465,10 +466,11 @@
         pluginContainer.innerHTML = `
           <div class="d-flex align-items-center justify-content-center h-100">
             <div class="text-center">
-              <div class="spinner-border text-primary mb-3" role="status">
-                <span class="visually-hidden">Loading...</span>
-              </div>
-              <p class="text-muted">Loading plugin...</p>
+              <img src="{{ url_for('static', filename='cutebot-eating-dags.gif') }}" 
+                   alt="Loading plugins..." 
+                   class="mb-3" 
+                   style="max-width: 90%; max-height: 50vh; width: auto; height: auto;">
+              <p class="text-muted">Cutebot is eating DAGs... Please wait!</p>
             </div>
           </div>
         `;

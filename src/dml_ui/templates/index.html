@@ -1,7 +1,9 @@
 {% extends "layout.html" %} {% block title %}Home - Notebook Viewer{% endblock%}
 {% block content %}
-<h1>Welcome to the Notebook Viewer</h1>
-<p>
-  Select a commit from the dropdown in the navigation bar to view its details.
-</p>
+<div class="text-center mb-5">
+  <img src="{{ url_for('static', filename='cutebot.webp') }}" 
+       alt="Cutebot" 
+       class="img-fluid rounded shadow-lg" 
+       style="max-width: 80%; max-height: 750px; width: auto; height: auto;">
+</div>
 {% endblock %}

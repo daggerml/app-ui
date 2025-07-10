@@ -1,0 +1,18 @@
+{% extends "layout.html" %} {% block title %}Page Not Found - DaggerML{% endblock%}
+{% block content %}
+<div class="text-center">
+  <h1 class="display-1 text-muted">404</h1>
+  <h2 class="mb-4">Page Not Found</h2>
+  
+  <div class="mb-5">
+    <img src="{{ url_for('static', filename='cutebot-underwater.webp') }}" 
+         alt="Cutebot Underwater" 
+         class="img-fluid rounded shadow-lg" 
+         style="max-width: 60%; max-height: 400px; width: auto; height: auto;">
+  </div>
+  
+  <p class="lead mb-4">
+    Oops! The page you're looking for seems to have gone underwater.
+  </p>
+</div>
+{% endblock %}
