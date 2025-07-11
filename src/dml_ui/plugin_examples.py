@@ -1,4 +1,5 @@
 import logging
+from time import time
 
 from dml_ui.plugins import DagDashboardPlugin, NodeDashboardPlugin
 
@@ -6,8 +7,8 @@ logger = logging.getLogger(__name__)
 
 # DAG Dashboard Plugins
 class ExampleDagPlugin(DagDashboardPlugin):
+    """An example DAG dashboard showing DAG-level information."""
     NAME = "Example DAG Dashboard"
-    DESCRIPTION = "An example DAG dashboard showing DAG-level information"
 
     def render(self):
         dag_id = self.dag._ref.to if hasattr(self.dag, '_ref') else 'Unknown'
@@ -21,13 +22,14 @@ class ExampleDagPlugin(DagDashboardPlugin):
             dag_nodes = dag_data.get("nodes", [])
         except Exception:
             pass
+        # include a link to /
         html = f"""
         <div class="container-fluid">
             <div class="row">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h5><i class="bi bi-diagram-3"></i> DAG Dashboard Example</h5>
+                            <h5><i class="fas fa-project-diagram"></i> DAG Dashboard Example</h5>
                         </div>
                         <div class="card-body">
                             <div class="row">
@@ -42,11 +44,40 @@ class ExampleDagPlugin(DagDashboardPlugin):
                                     <h6>DAG Actions</h6>
                                     <div class="d-grid gap-2">
                                         <button class="btn btn-outline-primary btn-sm" onclick="alert('DAG action executed!')">
-                                            <i class="bi bi-play"></i> Execute DAG
+                                            <i class="fas fa-play"></i> Execute DAG
                                         </button>
                                         <button class="btn btn-outline-secondary btn-sm" onclick="alert('DAG exported!')">
-                                            <i class="bi bi-download"></i> Export DAG
+                                            <i class="fas fa-download"></i> Export DAG
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6><i class="fas fa-clock"></i> Time Demo</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <label for="multiplier" class="form-label">Time Multiplier:</label>
+                                                    <input type="number" class="form-control" id="multiplier" name="method_args" value="1" step="0.1" min="0">
+                                                </div>
+                                                <div class="col-md-6 d-flex align-items-end">
+                                                    <button class="btn btn-outline-info btn-sm" 
+                                                            hx-get="{self.method_call_url('show_time')}"
+                                                            hx-include="#multiplier"
+                                                            hx-target="#timeResult"
+                                                            hx-swap="innerHTML">
+                                                        <i class="fas fa-clock"></i> Show Time
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div id="timeResult" class="mt-3">
+                                                <!-- Results will appear here -->
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -58,9 +89,28 @@ class ExampleDagPlugin(DagDashboardPlugin):
         """
         return html
 
+    def show_time(self, multiplier=1):
+        """An example of method calling that displays the current time."""
+        try:
+            multiplier = float(multiplier)
+            current_time = time() * multiplier
+            formatted_time = __import__('datetime').datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S')
+            
+            return f"""<div class="alert alert-success">
+                <h6><i class="fas fa-clock"></i> Time Result</h6>
+                <p><strong>Multiplier:</strong> {multiplier}</p>
+                <p><strong>Timestamp:</strong> {current_time}</p>
+                <p><strong>Formatted Time:</strong> {formatted_time}</p>
+            </div>"""
+        except Exception as e:
+            return f"""<div class="alert alert-danger">
+                <h6><i class="fas fa-exclamation-triangle"></i> Error</h6>
+                <p>Failed to calculate time: {str(e)}</p>
+            </div>"""
+
 class DagStatsPlugin(DagDashboardPlugin):
+    """Shows detailed statistics about the DAG structure."""
     NAME = "DAG Statistics"
-    DESCRIPTION = "Shows detailed statistics about the DAG structure"
 
     def render(self):
         dag_id = self.dag._ref.to if hasattr(self.dag, '_ref') else 'Unknown'
@@ -94,7 +144,7 @@ class DagStatsPlugin(DagDashboardPlugin):
             <div class="container-fluid">
                 <div class="card">
                     <div class="card-header bg-info text-white">
-                        <h5><i class="bi bi-bar-chart"></i> DAG Statistics</h5>
+                        <h5><i class="fas fa-chart-bar"></i> DAG Statistics</h5>
                     </div>
                     <div class="card-body">
                         <div class="row mb-3">
@@ -128,8 +178,8 @@ class DagStatsPlugin(DagDashboardPlugin):
 
 # Node Dashboard Plugins
 class ExampleNodePlugin(NodeDashboardPlugin):
+    """An example node dashboard showing node-level information."""
     NAME = "Example Node Dashboard"
-    DESCRIPTION = "An example node dashboard showing node-level information"
 
     def render(self):
         node_id = self.node.ref.to if hasattr(self.node, 'ref') else 'Unknown'
@@ -154,7 +204,7 @@ class ExampleNodePlugin(NodeDashboardPlugin):
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header bg-success text-white">
-                            <h5><i class="bi bi-node-plus"></i> Node Dashboard Example</h5>
+                            <h5><i class="fas fa-plus-circle"></i> Node Dashboard Example</h5>
                         </div>
                         <div class="card-body">
                             <div class="row">
@@ -169,10 +219,10 @@ class ExampleNodePlugin(NodeDashboardPlugin):
                                     <h6>Node Actions</h6>
                                     <div class="d-grid gap-2">
                                         <button class="btn btn-outline-success btn-sm" onclick="alert('Node executed!')">
-                                            <i class="bi bi-play-circle"></i> Execute Node
+                                            <i class="fas fa-play-circle"></i> Execute Node
                                         </button>
                                         <button class="btn btn-outline-info btn-sm" onclick="alert('Node inspected!')">
-                                            <i class="bi bi-search"></i> Inspect Node
+                                            <i class="fas fa-search"></i> Inspect Node
                                         </button>
                                     </div>
                                 </div>
@@ -192,8 +242,8 @@ class ExampleNodePlugin(NodeDashboardPlugin):
         return html
 
 class NodeDetailsPlugin(NodeDashboardPlugin):
+    """Shows detailed information about a node including dependencies."""
     NAME = "Node Details"
-    DESCRIPTION = "Shows detailed information about a node including dependencies"
 
     def render(self):
         node_id = self.node.ref.to if hasattr(self.node, 'ref') else 'Unknown'
@@ -236,7 +286,7 @@ class NodeDetailsPlugin(NodeDashboardPlugin):
             <div class="container-fluid">
                 <div class="card">
                     <div class="card-header bg-warning text-dark">
-                        <h5><i class="bi bi-info-circle"></i> Node Details</h5>
+                        <h5><i class="fas fa-info-circle"></i> Node Details</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">

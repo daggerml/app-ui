@@ -2,16 +2,18 @@ import importlib.metadata
 import logging
 
 from flask import url_for
-from daggerml.core import Dag, Node
+from daggerml.core import Dag, Dml, Node
 
 logger = logging.getLogger(__name__)
 
 class DashboardPlugin:
+    """Base dashboard plugin class."""
     NAME = None
-    DESCRIPTION = None
 
-    def __init__(self, dml):
-        self.dml = dml
+    @classmethod
+    def _id(cls):
+        """Unique identifier for the plugin, used in URLs and storage."""
+        return f"{cls.__module__}:{cls.__name__}"
 
     def render(self):
         """Return HTML content for the dashboard."""
@@ -30,15 +32,50 @@ class DashboardPlugin:
         return "#"
 
 class DagDashboardPlugin(DashboardPlugin):
-    def __init__(self, dml, dag: Dag):
-        super().__init__(dml)
-        self.dag = dag
-        self._current_dag_id = dag._ref.to if hasattr(dag, '_ref') else None
+
+    def __init__(self, repo, branch, dag_id):
+        self.repo = repo
+        self.branch = branch
+        self.dag_id = dag_id
+        self.dml = Dml(repo=repo, branch=branch)
+        self.dag = self.dml.load(dag_id)
+
+    def method_call_url(self, method_name, *args):
+        """Returns a URL to call a method on this plugin with the given arguments."""
+        return url_for(
+            "api_dashboard_content",
+            kind="dag",
+            repo=self.repo,
+            branch=self.branch,
+            dag_id=self.dag_id,
+            plugin_id=self._id(),
+            method=method_name,
+            # method_args=args,
+        )
 
 class NodeDashboardPlugin(DashboardPlugin):
-    def __init__(self, dml, node: Node):
-        super().__init__(dml)
-        self.node = node
+    def __init__(self, repo, branch, dag_id, node_id):
+        self.repo = repo
+        self.branch = branch
+        self.dag_id = dag_id
+        self.node_id = node_id
+        self.dml = Dml(repo=repo, branch=branch)
+        self.dag = self.dml.load(dag_id)
+        self.node = self.dag[node_id]
+
+    def method_call_url(self, method_name, *args):
+        """Returns a URL to call a method on this plugin with the given arguments."""
+        return url_for(
+            "api_dashboard_content",
+            kind="node",
+            repo=self.repo,
+            branch=self.branch,
+            dag_id=self.dag_id,
+            node_id=self.node_id,
+            plugin_id=self._id(),
+            method=method_name,
+            # method_args=args,
+        )
 
 def discover_dashboard_plugins(group):
     """Discover all available plugins for a given group"""
@@ -46,7 +83,7 @@ def discover_dashboard_plugins(group):
     for entry_point in importlib.metadata.entry_points(group=f"dml_ui.dashboard.{group}"):
         try:
             plugin_cls = entry_point.load()
-            plugins[f"{plugin_cls.__module__}:{plugin_cls.__name__}"] = plugin_cls
+            plugins[plugin_cls._id()] = plugin_cls
         except Exception as e:
             logger.warning(f"Failed to load plugin from entry point {entry_point.name}: {e}")
     return plugins

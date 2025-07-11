@@ -15,30 +15,30 @@ app = Flask(__name__)
 def get_breadcrumbs(repo, branch, dag_id=None, commit_id=None):
     """Generate breadcrumb navigation data"""
     breadcrumbs = []
-    breadcrumbs.append({"name": "dml", "url": url_for("main"), "icon": "bi-coin"})
+    # breadcrumbs.append({"name": "dml", "url": url_for("main"), "icon": "fas fa-coins"})
     if repo:
         breadcrumbs.append({
             "name": repo,
             "url": url_for("main", repo=repo),
-            "icon": "bi-database",
+            "icon": "fa fa-star-of-david",
         })
         if branch:
             breadcrumbs.append({
                 "name": branch,
                 "url": url_for("main", repo=repo, branch=branch),
-                "icon": "bi-git"
+                "icon": "fa fa-code-branch",
             })
             if commit_id:
                 breadcrumbs.append({
                     "name": commit_id.split("/")[-1][:8],
                     "url": url_for("commit_route", repo=repo, branch=branch, commit_id=commit_id),
-                    "icon": "bi-umbrella"
+                    "icon": "fa fa-code-commit",  # "fas fa-umbrella"
                 })
             if dag_id:
                 breadcrumbs.append({
                     "name": dag_id[0] + ":" + dag_id.split("/")[-1][:8],
                     "url": url_for("dag_route", repo=repo, branch=branch, dag_id=dag_id),
-                    "icon": "bi-asterisk",
+                    "icon": "fa fa-project-diagram",
                 })
     return breadcrumbs
 
@@ -58,7 +58,7 @@ def get_sidebar_data(dml, repo, branch, dag_id=None):
             repo_section["items"].append({
                 "name": repo_item["name"],
                 "url": url_for("main", repo=repo_item["name"]),
-                "icon": "bi-database-fill-gear",
+                "icon": "fa fa-star-of-david",
                 "type": "repo",
                 "active": is_current
             })
@@ -67,7 +67,7 @@ def get_sidebar_data(dml, repo, branch, dag_id=None):
         repo_section['items'].append({
             'name': 'Error loading repositories',
             'url': '#',
-            'icon': 'bi-exclamation-triangle',
+            'icon': 'fa fa-exclamation-triangle',
             'type': 'error'
         })
     sidebar["sections"].append(repo_section)
@@ -81,7 +81,7 @@ def get_sidebar_data(dml, repo, branch, dag_id=None):
                 branch_section['items'].append({
                     'name': branch_name,
                     'url': url_for('main', repo=repo, branch=branch_name),
-                    'icon': 'bi-git',
+                    'icon': 'fa fa-code-branch',
                     'type': 'branch',
                     'active': is_current
                 })
@@ -90,7 +90,7 @@ def get_sidebar_data(dml, repo, branch, dag_id=None):
             branch_section['items'].append({
                 'name': 'Error loading branches',
                 'url': '#',
-                'icon': 'bi-exclamation-triangle',
+                'icon': 'fa fa-exclamation-triangle',
                 'type': 'error'
             })
         sidebar["sections"].append(branch_section)
@@ -105,7 +105,7 @@ def get_sidebar_data(dml, repo, branch, dag_id=None):
                 dag_section['items'].append({
                     'name': dag_name,
                     'url': url_for('dag_route', repo=repo, branch=branch, dag_id=dag_item["id"]),
-                    'icon': 'bi-diagram-3',
+                    'icon': 'fa fa-project-diagram',
                     'type': 'dag',
                     'active': is_current
                 })
@@ -114,7 +114,7 @@ def get_sidebar_data(dml, repo, branch, dag_id=None):
             dag_section['items'].append({
                 'name': 'Error loading DAGs',
                 'url': '#',
-                'icon': 'bi-exclamation-triangle',
+                'icon': 'fa fa-exclamation-triangle',
                 'type': 'error'
             })
         sidebar["sections"].append(dag_section)
@@ -178,8 +178,6 @@ def node_route():
     node_id = request.args.get("node_id")
     dml = Dml(repo=repo, branch=branch)
     # Get DAG data for breadcrumbs and sidebar
-    dag_info = get_dag_info(dml, dag_id)
-    dag_data = dag_info.get("dag_data")
     breadcrumbs = get_breadcrumbs(repo, branch, dag_id=dag_id)
     sidebar = get_sidebar_data(dml, repo, branch, dag_id=dag_id)
     data = get_node_info(dml, dag_id, node_id)
@@ -270,57 +268,6 @@ def api_dag_data():
         # Extract components, keeping argv for frontend
         log_streams = data.pop("log_streams", {})
         dag_data = data.pop("dag_data")
-        # Process argv data for frontend display
-        # Use the new argv structure from node descriptions
-        argv_data = []
-        if dag_data.get("argv"):
-            try:
-                argv_node_ids = dag_data["argv"]
-                # Normalize argv_node_ids to always be a list for consistent processing
-                if isinstance(argv_node_ids, str):
-                    argv_node_ids = [argv_node_ids]
-                elif isinstance(argv_node_ids, list):
-                    pass  # Already a list
-                else:
-                    argv_node_ids = []
-                # For each argv node, get its description to extract argv node descriptions
-                for node_id in argv_node_ids:
-                    try:
-                        # Get node description with argv data
-                        node_description = dml("node", "describe", node_id)
-                        if node_description and "argv" in node_description:
-                            argv_list = node_description["argv"]
-                            if argv_list is not None and isinstance(argv_list, list):
-                                # Each item in argv_list is a dict describing an argv node
-                                for argv_node_desc in argv_list:
-                                    # Add navigation link to each argv node
-                                    argv_node_with_link = argv_node_desc.copy()
-                                    if "id" in argv_node_desc:
-                                        argv_node_with_link["link"] = url_for(
-                                            "node_route",
-                                            repo=repo,
-                                            branch=branch,
-                                            dag_id=dag_id,
-                                            node_id=argv_node_desc["id"]
-                                        )
-                                    argv_data.append(argv_node_with_link)
-                    except Exception as e:
-                        logger.warning(f"Failed to get argv data for node {node_id}: {e}")
-                        # Fall back to basic node info without argv descriptions
-                        node_info = next((node for node in dag_data["nodes"] if node["id"] == node_id), None)
-                        if node_info:
-                            node_with_link = node_info.copy()
-                            node_with_link["link"] = url_for(
-                                "node_route",
-                                repo=repo,
-                                branch=branch,
-                                dag_id=dag_id,
-                                node_id=node_id
-                            )
-                            argv_data.append(node_with_link)
-            except Exception as e:
-                logger.error(f"Error processing argv data: {e}")
-                argv_data = []
         # Add node links for frontend navigation
         for node in dag_data["nodes"]:
             node["link"] = url_for(
@@ -350,7 +297,6 @@ def api_dag_data():
         response_data = {
             "dag_data": dag_data,
             "log_streams": log_streams,
-            "argv": argv_data,
             **data  # Include script, error, result, html_uri etc.
         }
         return jsonify(response_data)
@@ -372,7 +318,7 @@ def api_plugins(kind):
             plugins_list.append({
                 "id": _id,
                 "name": plugin_cls.NAME,
-                "description": plugin_cls.DESCRIPTION or 'No description available',
+                "description": plugin_cls.__doc__ or 'No description available',
             })
         logger.info(f"Total {kind} plugins found: {len(plugins_list)}")
         return jsonify(plugins_list)
@@ -387,41 +333,28 @@ def api_dashboard_content(kind, plugin_id):
     API endpoint to get Dashboard content for a specific plugin.
     Returns HTML content that will be embedded in an iframe.
     """
-    fn = {
-        "dag": lambda dml, args: (dml.load(args.get("dag_id")),),
-        "node": lambda dml, args: (dml.load(args.get("dag_id"))[args.get("node_id")],),
-    }.get(kind)
-    if fn is None:
-        return f"<div style='text-align: center; padding: 50px;'><h3>Invalid kind '{kind}'</h3></div>", 400
     try:
         # Find the plugin by ID
         plugin_cls = discover_dashboard_plugins(kind).get(plugin_id)
         if not plugin_cls:
             return f"<div style='text-align: center; padding: 50px;'><h3>{kind.capitalize()} Plugin '{plugin_id}' not found</h3></div>", 404
-        repo = request.args.get("repo")
-        branch = request.args.get("branch")
-        dml = Dml(repo=repo, branch=branch)
-        try:
-            args = fn(dml, request.args)
-        except Exception as e:
-            logger.error(f"Error getting args for {kind} plugin {plugin_id}: {e}")
-            return f"<div style='text-align: center; padding: 50px;'><h3>{str(e)}</h3></div>", 400
-        try:
-            plugin_instance = plugin_cls(dml, *args)
-            rendered_content = plugin_instance.render()
-        except Exception as plugin_error:
-            logger.error(f"{kind.capitalize()} Plugin {plugin_id} failed to render: {plugin_error}")
-            rendered_content = f"""
-            <div class="alert alert-danger">
-                <h4><i class="bi bi-exclamation-triangle"></i> {kind.capitalize()} Plugin Error</h4>
-                <p><strong>Plugin:</strong> {plugin_cls.NAME}</p>
-                <p><strong>Error:</strong> {str(plugin_error)}</p>
-                <details class="mt-3">
-                    <summary>Technical Details</summary>
-                    <pre class="mt-2 p-2 bg-light"><code>{repr(plugin_error)}</code></pre>
-                </details>
-            </div>
-            """
+        kw = request.args.to_dict()
+        method = kw.pop("method", None)
+        kw.pop("method_args", None)  # Remove method_args if present
+        # Get method_args as a list, even if there's only one value
+        method_args = request.args.getlist("method_args")
+        plugin_instance = plugin_cls(**kw)
+        if method:
+            # If a method is specified, call it with the provided arguments and return the result
+            if not hasattr(plugin_instance, method):
+                return f"<div style='text-align: center; padding: 50px;'><h3>Method '{method}' not found in {kind.capitalize()} Plugin '{plugin_id}'</h3></div>", 404
+            method_result = getattr(plugin_instance, method)(*method_args)
+            # For HTMX requests, return HTML directly
+            if isinstance(method_result, str):
+                return method_result, 200, {'Content-Type': 'text/html'}
+            else:
+                return jsonify(method_result), 200
+        rendered_content = plugin_instance.render()
         # Wrap content in a complete HTML document for iframe
         html_content = f"""
         <!DOCTYPE html>
@@ -448,18 +381,30 @@ def api_dashboard_content(kind, plugin_id):
                 {rendered_content}
             </div>
             <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+            <script src="https://unpkg.com/htmx.org@1.9.10"></script>
         </body>
         </html>
         """
         return html_content, 200, {'Content-Type': 'text/html'}
     except Exception as e:
         logger.error(f"Error rendering {kind.capitalize()} plugin {plugin_id}: {e}", exc_info=True)
-        return f"<div class='alert alert-danger'>Error: {str(e)}</div>", 500
+        rendered_content = f"""
+        <div class="alert alert-danger">
+            <h4><i class="fas fa-exclamation-triangle"></i> {kind.capitalize()} Plugin Error</h4>
+            <p><strong>Plugin:</strong> {plugin_id}</p>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <details class="mt-3">
+                <summary>Technical Details</summary>
+                <pre class="mt-2 p-2 bg-light"><code>{repr(e)}</code></pre>
+            </details>
+        </div>
+        """
+        return rendered_content, 500
 
 @app.errorhandler(404)
 def page_not_found(error):
     """Custom 404 error handler"""
-    return render_template('404.html'), 404
+    return render_template("404.html"), 404
 
 def run():
     parser = ArgumentParser()

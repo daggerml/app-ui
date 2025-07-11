@@ -157,7 +157,7 @@
         <div class="card">
           <div class="card-header">
             <h5 class="card-title mb-0">
-              <i class="bi bi-info-circle me-2"></i>
+              <i class="fas fa-info-circle me-2"></i>
               Node Information
             </h5>
           </div>
@@ -185,7 +185,7 @@
         <div class="card code-container">
           <div class="card-header">
             <h5 class="card-title mb-0">
-              <i class="bi bi-database me-2"></i>
+              <i class="fas fa-database me-2"></i>
               Data
             </h5>
           </div>
@@ -206,7 +206,7 @@
           <div class="card">
             <div class="card-header">
               <h5 class="card-title mb-0">
-                <i class="bi bi-list-ul me-2"></i>
+                <i class="fas fa-list-ul me-2"></i>
                 argv
               </h5>
               <p class="text-muted mb-0 small">Individual argv node details</p>
@@ -262,7 +262,7 @@
                     {% if element.id %}
                     <div class="card-footer">
                       <a href="{{ url_for('node_route', repo=request.args.get('repo'), branch=request.args.get('branch'), dag_id=dag_id, node_id=element.id) }}" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-arrow-right-circle"></i> View Node
+                        <i class="fas fa-arrow-right"></i> View Node
                       </a>
                     </div>
                     {% endif %}
@@ -282,7 +282,7 @@
         <div class="card code-container">
           <div class="card-header">
             <h5 class="card-title mb-0">
-              <i class="bi bi-code-slash me-2"></i>
+              <i class="fas fa-code me-2"></i>
               Code
             </h5>
           </div>
@@ -299,7 +299,7 @@
         <div class="card code-container">
           <div class="card-header">
             <h5 class="card-title mb-0">
-              <i class="bi bi-exclamation-triangle me-2"></i>
+              <i class="fas fa-exclamation-triangle me-2"></i>
               Stacktrace
             </h5>
           </div>
@@ -316,7 +316,7 @@
         <div class="card">
           <div class="card-header">
             <h5 class="card-title mb-0">
-              <i class="bi bi-filetype-html me-2"></i>
+              <i class="fas fa-file-code me-2"></i>
               HTML
             </h5>
           </div>
@@ -336,7 +336,7 @@
             <div class="card-header">
               <div class="d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
-                  <i class="bi bi-plugin me-2"></i>
+                  <i class="fas fa-plug me-2"></i>
                   Plugins
                 </h5>
                 <div class="dropdown">
@@ -353,7 +353,7 @@
               <div id="plugin-container" style="width: 100%; min-height: 60vh; border: none;">
                 <div class="d-flex align-items-center justify-content-center h-100 text-muted">
                   <div class="text-center">
-                    <i class="bi bi-plugin fs-1 mb-3"></i>
+                    <i class="fas fa-plug fs-1 mb-3"></i>
                     <p>Select a plugin from the dropdown above to display its content</p>
                   </div>
                 </div>
@@ -383,6 +383,15 @@
       });
       
       function loadPlugins() {
+        // Dispose of existing tooltips before replacing content
+        const existingTooltips = pluginDropdown.querySelectorAll('[data-bs-toggle="tooltip"]');
+        existingTooltips.forEach(tooltipEl => {
+          const tooltip = bootstrap.Tooltip.getInstance(tooltipEl);
+          if (tooltip) {
+            tooltip.dispose();
+          }
+        });
+        
         pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>';
         
         // Fetch available node plugins from backend
@@ -391,8 +400,17 @@
           .then(plugins => {
             if (plugins && plugins.length > 0) {
               pluginDropdown.innerHTML = plugins.map(plugin => 
-                `<li><a class="dropdown-item" href="#" data-plugin-id="${plugin.id}">${plugin.name}</a></li>`
+                `<li><a class="dropdown-item" href="#" data-plugin-id="${plugin.id}" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="right" 
+                        title="${plugin.description || 'No description available'}">${plugin.name}</a></li>`
               ).join('');
+              
+              // Initialize tooltips for plugin dropdown items
+              const tooltipTriggerList = [].slice.call(pluginDropdown.querySelectorAll('[data-bs-toggle="tooltip"]'));
+              tooltipTriggerList.forEach(tooltipTriggerEl => {
+                new bootstrap.Tooltip(tooltipTriggerEl);
+              });
               
               // Add click event listeners to plugin options
               pluginDropdown.querySelectorAll('.dropdown-item').forEach(item => {
@@ -480,7 +498,7 @@
         pluginContainer.innerHTML = `
           <div class="d-flex align-items-center justify-content-center h-100">
             <div class="text-center">
-              <i class="bi bi-exclamation-triangle text-danger fs-1 mb-3"></i>
+              <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
               <p class="text-danger">${message}</p>
             </div>
           </div>

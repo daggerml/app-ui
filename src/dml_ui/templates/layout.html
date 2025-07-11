@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>{% block title %}daggerml{% endblock %}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link
       href="https://bootswatch.com/5/minty/bootstrap.min.css"
       rel="stylesheet"
@@ -305,6 +305,8 @@
       
       /* Main content styling */
       .main-content {
+        max-width: 1200px;
+        margin: 0 auto;
         padding: 2rem;
         min-height: calc(100vh - 76px);
       }
@@ -346,7 +348,9 @@
       }
       
       .main-content {
-        max-width: none;
+        max-width: 1500px;
+        margin: 0 auto;
+        padding: 2rem;
       }
       
       h1, h2, h3, h4, h5, h6 {
@@ -379,6 +383,7 @@
 
     </style>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     {% block extra_header %}{% endblock %}
   </head>
   <body>
@@ -386,7 +391,7 @@
       <div class="container">
         {% if sidebar is defined and sidebar['sections'] %}
           <button class="sidebar-toggle me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Toggle sidebar">
-            <i class="bi bi-layout-sidebar-inset"></i>
+            <i class="fas fa-bars"></i>
           </button>
         {% endif %}
         <a class="navbar-brand" href="{{ url_for('main') }}">daggerml</a>
@@ -426,7 +431,7 @@
           {% endif %}
           <div class="d-flex ms-auto">
             <button id="themeToggle" class="btn">
-              <i id="theme-icon" class="bi"></i>
+              <i id="theme-icon" class="fas fa-sun"></i>
             </button>
           </div>
         </div>
@@ -438,7 +443,7 @@
       <div class="offcanvas offcanvas-start offcanvas-sidebar" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
         <div class="sidebar-header">
           <h5 class="sidebar-title" id="sidebarOffcanvasLabel">
-            <i class="bi bi-layout-sidebar-inset"></i>
+            <i class="fas fa-bars"></i>
             {{ sidebar['title'] }}
           </h5>
           <button type="button" class="btn-close sidebar-close-btn" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -447,15 +452,15 @@
           {% for section in sidebar['sections'] %}
             <div class="sidebar-section">
               <div class="sidebar-section-header" onclick="toggleSection('{{ section['type'] }}')">
-                <i class="bi bi-chevron-down sidebar-section-toggle{% if section['collapsed'] %} collapsed{% endif %}" id="toggle-{{ section['type'] }}"></i>
+                <i class="fas fa-chevron-down sidebar-section-toggle{% if section['collapsed'] %} collapsed{% endif %}" id="toggle-{{ section['type'] }}"></i>
                 {% if section['type'] == 'repos' %}
-                  <i class="bi bi-database-gear sidebar-section-icon"></i>
+                  <i class="fas fa-star-of-david sidebar-section-icon"></i>
                 {% elif section['type'] == 'branches' %}
-                  <i class="bi bi-git sidebar-section-icon"></i>
+                  <i class="fas fa-code-branch sidebar-section-icon"></i>
                 {% elif section['type'] == 'dags' %}
-                  <i class="bi bi-diagram-3 sidebar-section-icon"></i>
+                  <i class="fas fa-project-diagram sidebar-section-icon"></i>
                 {% else %}
-                  <i class="bi bi-list-ul sidebar-section-icon"></i>
+                  <i class="fas fa-list-ul sidebar-section-icon"></i>
                 {% endif %}
                 <span>{{ section['title'] }}</span>
               </div>
@@ -544,11 +549,11 @@
           
           // Update theme icon
           if (theme === 'dark') {
-            themeIcon.classList.remove('bi-sun');
-            themeIcon.classList.add('bi-moon');
+            themeIcon.classList.remove('fa-sun');
+            themeIcon.classList.add('fa-moon');
           } else {
-            themeIcon.classList.remove('bi-moon');
-            themeIcon.classList.add('bi-sun');
+            themeIcon.classList.remove('fa-moon');
+            themeIcon.classList.add('fa-sun');
           }
           
           // Update offcanvas close button for dark mode

@@ -8,13 +8,13 @@
   - Graph: Interactive network visualization of nodes and edges
   - Result: Display of DAG execution results
   - Logs: Stdout/stderr output from DAG execution
-  - argv: Command-line arguments passed to the DAG
+  <!-- - argv: Command-line arguments passed to the DAG -->
   
   The template expects the following context variables:
   - dag_data: Dictionary containing nodes, edges, and metadata
   - result: DAG execution result (optional)
   - log_streams: Dictionary with stdout/stderr log information (optional)
-  - argv: List of argument node data (optional)
+  <!-- - argv: List of argument node data (optional) -->
 #}
 
 {% block extra_header %}
@@ -1097,7 +1097,7 @@
     <div class="dag-stats-inline ms-auto">
       <div class="dag-stats-container">
         <div class="dag-stats-header">
-          <i class="bi bi-bar-chart-line"></i>
+          <i class="fas fa-chart-bar"></i>
           DAG Statistics
         </div>
         
@@ -1127,9 +1127,6 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="table-tab" data-bs-toggle="tab" data-bs-target="#table" type="button" role="tab" aria-controls="table" aria-selected="false">Node Table</button>
     </li>
-    <li class="nav-item" role="presentation" id="argv-tab-container" style="display: none;">
-      <button class="nav-link" id="argv-tab" data-bs-toggle="tab" data-bs-target="#argv" type="button" role="tab" aria-controls="argv" aria-selected="false">argv</button>
-    </li>
     <li class="nav-item" role="presentation" id="code-tab-container" style="display: none;">
       <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code" type="button" role="tab" aria-controls="code" aria-selected="false">Executed Code</button>
     </li>
@@ -1152,9 +1149,9 @@
   <div class="tab-content mt-3" id="dagTabContent">
     <div class="tab-pane fade show active" id="viz" role="tabpanel" aria-labelledby="viz-tab">
       <div class="d-flex align-items-center mb-2" id="cy-controls">
-        <button class="btn btn-outline-secondary btn-sm me-2" id="cy-zoom-in" title="Zoom In"><i class="bi bi-zoom-in"></i> Zoom In</button>
-        <button class="btn btn-outline-secondary btn-sm me-2" id="cy-zoom-out" title="Zoom Out"><i class="bi bi-zoom-out"></i> Zoom Out</button>
-        <button class="btn btn-outline-secondary btn-sm" id="cy-reset" title="Reset View"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+        <button class="btn btn-outline-secondary btn-sm me-2" id="cy-zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i> Zoom In</button>
+        <button class="btn btn-outline-secondary btn-sm me-2" id="cy-zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i> Zoom Out</button>
+        <button class="btn btn-outline-secondary btn-sm" id="cy-reset" title="Reset View"><i class="fas fa-redo"></i> Reset</button>
       </div>
       <div style="position: relative;">
         <div id="cy">
@@ -1196,27 +1193,6 @@
         </table>
       </div>
     </div>
-    <div class="tab-pane fade" id="argv" role="tabpanel" aria-labelledby="argv-tab">
-      <div class="container-fluid">
-        <div class="card">
-          <div class="card-header">
-            <h5 class="card-title mb-0">
-              <i class="bi bi-list-ul me-2"></i>
-              argv
-            </h5>
-            <p class="text-muted mb-0 small">Individual argv nodes in this DAG</p>
-          </div>
-          <div class="card-body" id="argvContent">
-            <div class="text-center p-4">
-              <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-              </div>
-              <p class="mt-2">Loading arguments...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
     <div class="tab-pane fade" id="code" role="tabpanel" aria-labelledby="code-tab">
       <div class="container-fluid">
         <div class="card code-container">
@@ -1240,7 +1216,7 @@
         <div class="logs-header">
           <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 0;">
             <div class="logs-title" style="flex-shrink: 0;">
-              <i class="bi bi-activity"></i>
+              <i class="fas fa-stream"></i>
               <span>Log Streams</span>
             </div>
             <div class="logs-stream-tabs-inline" id="logStreamTabsInline">
@@ -1261,15 +1237,15 @@
             </div>
             <div class="logs-header-actions" id="logsHeaderActions" style="display: none;">
               <button class="logs-action-btn" data-action="refresh" title="Refresh logs">
-                <i class="bi bi-arrow-clockwise"></i>
+                <i class="fas fa-sync-alt"></i>
                 Refresh
               </button>
               <button class="logs-action-btn" data-action="clear" title="Clear logs">
-                <i class="bi bi-trash"></i>
+                <i class="fas fa-trash"></i>
                 Clear
               </button>
               <a href="#" class="logs-action-btn aws-console-link" id="currentStreamAwsLink" target="_blank" rel="noopener noreferrer" title="Open in AWS CloudWatch Console">
-                <i class="bi bi-cloud"></i>
+                <i class="fab fa-aws"></i>
                 AWS Console
               </a>
             </div>
@@ -1316,16 +1292,6 @@
         </div>
       </div>
     </div>
-    <div class="tab-pane fade" id="html" role="tabpanel" aria-labelledby="html-tab">
-      <div id="htmlContent">
-        <div class="text-center p-4">
-          <div class="spinner-border" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <p class="mt-2">Loading HTML content...</p>
-        </div>
-      </div>
-    </div>
     <div class="tab-pane fade" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
       <div class="container-fluid">
         <div class="card">
@@ -1346,7 +1312,7 @@
             <div id="plugin-container" style="width: 100%; min-height: 60vh; border: none;">
               <div class="d-flex align-items-center justify-content-center h-100 text-muted">
                 <div class="text-center">
-                  <i class="bi bi-plugin fs-1 mb-3"></i>
+                  <i class="fas fa-plug fs-1 mb-3"></i>
                   <p>Select a plugin from the dropdown above to display its content</p>
                 </div>
               </div>
@@ -1639,7 +1605,6 @@
    * if the corresponding data is available and non-empty.
    * 
    * @param {Object} data - The DAG data object containing various optional properties
-   * @param {Array} data.argv - Array of argument nodes (shows argv tab if non-empty)
    * @param {string} data.script - Script content (shows code tab if present)
    * @param {Object} data.log_streams - Log stream data (shows logs tab if non-empty)
    * @param {string} data.error - Error information (shows error tab if present)
@@ -1648,7 +1613,6 @@
    */
   function updateTabVisibility(data) {
     const tabMap = {
-      'argv-tab-container': data.argv && data.argv.length > 0,
       'code-tab-container': data.script,
       'logs-tab-container': data.log_streams && Object.keys(data.log_streams).length > 0,
       'error-tab-container': data.error,
@@ -1682,35 +1646,18 @@
         <pre class="mb-0"><code class="language-python">${data.script}</code></pre>
       `;
     }
-    
-    // Argv tab
-    if (data.argv && data.argv.length > 0) {
-      populateArgvTab(data.argv);
-    }
-    
     // Error tab
     if (data.error) {
       document.getElementById('errorContent').innerHTML = `
         <pre><code class="language-python">${data.error}</code></pre>
       `;
     }
-    
     // Result tab
     if (data.result) {
       document.getElementById('resultContent').innerHTML = `
         <pre class="mb-0"><code class="language-python">${data.result}</code></pre>
       `;
     }
-    
-    // HTML tab
-    if (data.html_uri) {
-      document.getElementById('htmlContent').innerHTML = `
-        <iframe src="${data.html_uri}"
-                style="width: 100%; height: 100vh; border: none;"
-                sandbox="allow-scripts allow-same-origin"></iframe>
-      `;
-    }
-    
     // Initialize log state for logs tab
     if (data.log_streams) {
       logState = {};
@@ -1740,14 +1687,14 @@
       
       logStreamTabs.innerHTML = `
         <div class="logs-empty-state">
-          <i class="bi bi-file-text"></i>
+          <i class="fas fa-file-alt"></i>
           <h6>No log streams available</h6>
           <p>No log streams were found for this DAG execution.</p>
         </div>
       `;
       logsContentArea.innerHTML = `
         <div class="logs-empty-state">
-          <i class="bi bi-file-text"></i>
+          <i class="fas fa-file-alt"></i>
           <h6>No log streams available</h6>
           <p>No log streams were found for this DAG execution.</p>
         </div>
@@ -1760,7 +1707,7 @@
     
     // Create stream tabs
     const streamTabs = streamNames.map((streamName, index) => {
-      const streamIcon = streamName.toLowerCase().includes('error') || streamName.toLowerCase().includes('stderr') ? 'bi-exclamation-triangle' : 'bi-file-text';
+      const streamIcon = streamName.toLowerCase().includes('error') || streamName.toLowerCase().includes('stderr') ? 'fas fa-exclamation-triangle' : 'fas fa-file-alt';
       const streamType = streamName.toLowerCase().includes('error') || streamName.toLowerCase().includes('stderr') ? 'Error' : 'Output';
       const isActive = index === 0;
       
@@ -1801,11 +1748,11 @@
           </div>
           <div class="logs-pagination-controls">
             <button class="logs-pagination-btn" data-stream-name="${firstStreamName}" data-direction="backward" disabled>
-              <i class="bi bi-arrow-up"></i>
+              <i class="fas fa-arrow-up"></i>
               Earlier
             </button>
             <button class="logs-pagination-btn" data-stream-name="${firstStreamName}" data-direction="forward" disabled>
-              <i class="bi bi-arrow-down"></i>
+              <i class="fas fa-arrow-down"></i>
               Later
             </button>
           </div>
@@ -1899,11 +1846,11 @@
           </div>
           <div class="logs-pagination-controls">
             <button class="logs-pagination-btn" data-stream-name="${streamName}" data-direction="backward" disabled>
-              <i class="bi bi-arrow-up"></i>
+              <i class="fas fa-arrow-up"></i>
               Earlier
             </button>
             <button class="logs-pagination-btn" data-stream-name="${streamName}" data-direction="forward" disabled>
-              <i class="bi bi-arrow-down"></i>
+              <i class="fas fa-arrow-down"></i>
               Later
             </button>
           </div>
@@ -1970,7 +1917,7 @@
     notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
     notification.style.cssText = 'top: 20px; right: 20px; z-index: 1050; max-width: 300px;';
     notification.innerHTML = `
-      <i class="bi bi-info-circle me-2"></i>
+      <i class="fas fa-info-circle me-2"></i>
       ${message}
       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
@@ -2019,7 +1966,7 @@
     if (logsContent) {
       logsContent.innerHTML = `
         <div class="logs-empty-state">
-          <i class="bi bi-file-text"></i>
+          <i class="fas fa-file-alt"></i>
           <h6>Logs cleared</h6>
           <p>Click refresh to reload log entries.</p>
         </div>
@@ -2047,29 +1994,29 @@
   // Helper function to get data type icon
   function getDataTypeIcon(dataType) {
     const iconMap = {
-      'list': 'bi-list-ul',
-      'dict': 'bi-collection',
-      'str': 'bi-type',
-      'int': 'bi-123',
-      'float': 'bi-decimal',
-      'bool': 'bi-check-square',
-      'bytes': 'bi-file-binary',
-      'tuple': 'bi-collection',
-      'set': 'bi-diagram-3',
-      'object': 'bi-box'
+      'list': 'fas fa-list-ul',
+      'dict': 'fas fa-th-list',
+      'str': 'fas fa-font',
+      'int': 'fas fa-sort-numeric-up',
+      'float': 'fas fa-calculator',
+      'bool': 'fas fa-check-square',
+      'bytes': 'fas fa-file-code',
+      'tuple': 'fas fa-layer-group',
+      'set': 'fas fa-project-diagram',
+      'object': 'fas fa-cube'
     };
-    return iconMap[dataType] || 'bi-file';
+    return iconMap[dataType] || 'fas fa-file';
   }
 
   // Helper function to get node type icon
   function getNodeTypeIcon(nodeType) {
     const iconMap = {
-      'fn': 'bi-gear',
-      'import': 'bi-box-arrow-in-down',
-      'literal': 'bi-file-text',
-      'argv': 'bi-terminal'
+      'fn': 'fas fa-cog',
+      'import': 'fas fa-download',
+      'literal': 'fas fa-quote-left',
+      'argv': 'fas fa-terminal'
     };
-    return iconMap[nodeType] || 'bi-circle';
+    return iconMap[nodeType] || 'fas fa-circle';
   }
 
   // Helper function to escape HTML
@@ -2080,99 +2027,13 @@
     return div.innerHTML;
   }
 
-  // Function to populate argv tab
-  function populateArgvTab(argvData) {
-    const argvContent = document.getElementById('argvContent');
-    
-    if (!argvData || argvData.length === 0) {
-      argvContent.innerHTML = `
-        <div class="text-center p-4 text-muted">
-          <i class="bi bi-info-circle fs-3"></i>
-          <p class="mt-2">No argv found for this DAG</p>
-        </div>
-      `;
-      return;
-    }
-    
-    // Create a grid of cards for each argv node description
-    const argvCards = argvData.map((argvNode, index) => {
-      const dataTypeIcon = getDataTypeIcon(argvNode.data_type);
-      const nodeTypeIcon = getNodeTypeIcon(argvNode.node_type);
-      
-      return `
-        <div class="col-md-6 col-lg-4 mb-3">
-          <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <span class="badge bg-primary">argv[${index}]</span>
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-secondary">
-                  <i class="${nodeTypeIcon}"></i> ${argvNode.node_type || 'unknown'}
-                </span>
-                ${argvNode.data_type ? `<span class="badge bg-info">
-                  <i class="${dataTypeIcon}"></i> ${argvNode.data_type}
-                </span>` : ''}
-              </div>
-            </div>
-            <div class="card-body">
-              ${argvNode.name ? `<h6 class="card-title">${escapeHtml(argvNode.name)}</h6>` : ''}
-              
-              <dl class="row small mb-2">
-                <dt class="col-sm-4">Node ID:</dt>
-                <dd class="col-sm-8"><code class="small">${argvNode.id || 'N/A'}</code></dd>
-                
-                ${argvNode.datum_id ? `
-                <dt class="col-sm-4">Datum ID:</dt>
-                <dd class="col-sm-8"><code class="small">${argvNode.datum_id}</code></dd>
-                ` : ''}
-                
-                ${argvNode.length !== null && argvNode.length !== undefined ? `
-                <dt class="col-sm-4">Length:</dt>
-                <dd class="col-sm-8">${argvNode.length}</dd>
-                ` : ''}
-                
-                ${argvNode.dict_keys && argvNode.dict_keys.length > 0 ? `
-                <dt class="col-sm-4">Keys:</dt>
-                <dd class="col-sm-8">
-                  ${argvNode.dict_keys.map(key => `<span class="badge bg-light text-dark me-1">${escapeHtml(key)}</span>`).join('')}
-                </dd>
-                ` : ''}
-              </dl>
-              
-              ${argvNode.doc ? `
-              <div class="mb-2">
-                <small class="text-muted">Documentation:</small>
-                <p class="small">${escapeHtml(argvNode.doc)}</p>
-              </div>
-              ` : ''}
-            </div>
-            <div class="card-footer">
-              ${argvNode.link ? `
-              <a href="${argvNode.link}" class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-arrow-right-circle"></i> View Node
-              </a>
-              ` : `
-              <span class="text-muted small">Node details not available</span>
-              `}
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-    
-    argvContent.innerHTML = `
-      <div class="row">
-        ${argvCards}
-      </div>
-    `;
-  }
-
   // Function to show error message
   function showError(message) {
     const statsGrid = document.getElementById('dagStatsGrid');
     statsGrid.innerHTML = `
       <div class="dag-stat-item" style="background-color: #f8d7da; border-color: #f5c6cb;">
         <div class="dag-stat-value" style="color: #721c24;">
-          <i class="bi bi-exclamation-triangle"></i>
+          <i class="fas fa-exclamation-triangle"></i>
         </div>
         <div class="dag-stat-label" style="color: #721c24;">Error</div>
       </div>
@@ -2630,7 +2491,7 @@
           
           const errorHtml = `
             <div class="logs-empty-state">
-              <i class="bi bi-exclamation-triangle text-danger"></i>
+              <i class="fas fa-exclamation-triangle text-danger"></i>
               <h6>Error loading logs</h6>
               <p>${escapeHtml(data.error)}</p>
             </div>
@@ -2648,7 +2509,7 @@
           
           const emptyHtml = `
             <div class="logs-empty-state">
-              <i class="bi bi-file-text"></i>
+              <i class="fas fa-file-alt"></i>
               <h6>No log entries found</h6>
               <p>This log stream appears to be empty or no logs are available for the selected time range.</p>
             </div>
@@ -2670,7 +2531,7 @@
         
         const errorHtml = `
           <div class="logs-empty-state">
-            <i class="bi bi-exclamation-triangle text-danger"></i>
+            <i class="fas fa-exclamation-triangle text-danger"></i>
             <h6>Failed to load logs</h6>
             <p>Unable to connect to the log service. Please check your connection and try again.</p>
           </div>
@@ -2728,6 +2589,15 @@
     });
     
     function loadPlugins() {
+      // Dispose of existing tooltips before replacing content
+      const existingTooltips = pluginDropdown.querySelectorAll('[data-bs-toggle="tooltip"]');
+      existingTooltips.forEach(tooltipEl => {
+        const tooltip = bootstrap.Tooltip.getInstance(tooltipEl);
+        if (tooltip) {
+          tooltip.dispose();
+        }
+      });
+      
       pluginDropdown.innerHTML = '<li><span class="dropdown-item-text text-muted">Loading plugins...</span></li>';
       
       // Fetch available plugins from backend
@@ -2736,8 +2606,17 @@
         .then(plugins => {
           if (plugins && plugins.length > 0) {
             pluginDropdown.innerHTML = plugins.map(plugin => 
-              `<li><a class="dropdown-item" href="#" data-plugin-id="${plugin.id}">${plugin.name}</a></li>`
+              `<li><a class="dropdown-item" href="#" data-plugin-id="${plugin.id}" 
+                      data-bs-toggle="tooltip" 
+                      data-bs-placement="right" 
+                      title="${plugin.description || 'No description available'}">${plugin.name}</a></li>`
             ).join('');
+            
+            // Initialize tooltips for plugin dropdown items
+            const tooltipTriggerList = [].slice.call(pluginDropdown.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(tooltipTriggerEl => {
+              new bootstrap.Tooltip(tooltipTriggerEl);
+            });
             
             // Add click event listeners to plugin options
             pluginDropdown.querySelectorAll('.dropdown-item').forEach(item => {
@@ -2824,7 +2703,7 @@
       pluginContainer.innerHTML = `
         <div class="d-flex align-items-center justify-content-center h-100">
           <div class="text-center">
-            <i class="bi bi-exclamation-triangle text-danger fs-1 mb-3"></i>
+            <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
             <p class="text-danger">${message}</p>
           </div>
         </div>
