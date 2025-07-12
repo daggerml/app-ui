@@ -44,11 +44,9 @@ Issues = "https://github.com/daggerml/dml-ui/issues"
 Source = "https://github.com/daggerml/dml-ui"
 
 [project.entry-points."dml_ui.dashboard.dag"]
-dag_stats_plugin = "dml_ui.plugin_examples:DagStatsPlugin"
 example_dag_plugin = "dml_ui.plugin_examples:ExampleDagPlugin"
 
 [project.entry-points."dml_ui.dashboard.node"]
-node_details_plugin = "dml_ui.plugin_examples:NodeDetailsPlugin"
 example_node_plugin = "dml_ui.plugin_examples:ExampleNodePlugin"
 
 [project.scripts]

@@ -1,5 +1,4 @@
 import logging
-from time import time
 
 from dml_ui.plugins import DagDashboardPlugin, NodeDashboardPlugin
 
@@ -7,77 +6,243 @@ logger = logging.getLogger(__name__)
 
 # DAG Dashboard Plugins
 class ExampleDagPlugin(DagDashboardPlugin):
-    """An example DAG dashboard showing DAG-level information."""
-    NAME = "Example DAG Dashboard"
+    """Educational DAG dashboard demonstrating DAG operations, backend methods, and data visualization."""
+    NAME = "DAG Operations Tutorial"
 
     def render(self):
         dag_id = self.dag._ref.to if hasattr(self.dag, '_ref') else 'Unknown'
-        # Get DAG information
-        from time import sleep
-        sleep(1)  # Simulate a delay for loading data
-        dag_nodes = []
-        try:
-            # Access dag nodes through the dag object
-            dag_data = self.dml("dag", "describe", dag_id)
-            dag_nodes = dag_data.get("nodes", [])
-        except Exception:
-            pass
-        # include a link to /
+        
+        # 1. DAG Operations Demo
+        node_names = list(self.dag.keys())
+        node_count = len(node_names)
+        
+        # Get node values and analyze them
+        node_data = []
+        numeric_values = []
+        
+        for node_name in node_names[:10]:  # Limit to first 10 nodes for display
+            try:
+                node = self.dag[node_name]
+                value = node.value()
+                node_data.append({
+                    'name': node_name,
+                    'value': str(value)[:100] + ('...' if len(str(value)) > 100 else ''),
+                    'type': type(value).__name__,
+                    'raw_value': value
+                })
+                
+                # Check if value is numeric for charting
+                if isinstance(value, (int, float)):
+                    numeric_values.append({'name': node_name, 'value': float(value)})
+                elif hasattr(value, '__len__') and not isinstance(value, str):
+                    try:
+                        # Try to get length for collections
+                        numeric_values.append({'name': f"{node_name} (length)", 'value': len(value)})
+                    except Exception:
+                        pass
+            except Exception as e:
+                node_data.append({
+                    'name': node_name,
+                    'value': f"Error: {str(e)}",
+                    'type': 'Error',
+                    'raw_value': None
+                })
+        
+        # Create node list HTML
+        node_list_html = ""
+        for node in node_data:
+            badge_color = 'success' if node['type'] != 'Error' else 'danger'
+            node_list_html += f"""
+            <tr>
+                <td><code>{node['name']}</code></td>
+                <td><span class="badge bg-{badge_color}">{node['type']}</span></td>
+                <td><small>{node['value']}</small></td>
+            </tr>
+            """
+        
+        # Create chart for numeric values
+        chart_html = ""
+        if numeric_values:
+            max_val = max(v['value'] for v in numeric_values) if numeric_values else 1
+            chart_html = """
+            <h6><i class="fas fa-chart-bar"></i> Numeric Values Visualization</h6>
+            <div class="mb-3">
+            """
+            for item in numeric_values[:8]:  # Limit to 8 bars for readability
+                percentage = (item['value'] / max_val * 100) if max_val > 0 else 0
+                chart_html += f"""
+                <div class="d-flex align-items-center mb-2">
+                    <div style="width: 120px; font-size: 0.8em;" class="text-truncate">
+                        <code>{item['name']}</code>
+                    </div>
+                    <div class="flex-grow-1 mx-2">
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-info" role="progressbar" 
+                                 style="width: {percentage}%" 
+                                 title="{item['value']}">
+                            </div>
+                        </div>
+                    </div>
+                    <div style="width: 80px; font-size: 0.8em;" class="text-end">
+                        <strong>{item['value']}</strong>
+                    </div>
+                </div>
+                """
+            chart_html += "</div>"
+        else:
+            chart_html = """
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No numeric values found in the first 10 nodes for visualization.
+            </div>
+            """
+
         html = f"""
         <div class="container-fluid">
-            <div class="row">
+            <!-- Header -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="alert alert-primary">
+                        <h5><i class="fas fa-graduation-cap"></i> DAG Operations Tutorial</h5>
+                        <p>This plugin demonstrates key DAG operations and backend methods in DaggerML. 
+                           Study the code examples below to learn how to interact with DAGs programmatically.</p>
+                        <strong>Current DAG:</strong> <code>{dag_id}</code> | 
+                        <strong>Total Nodes:</strong> {node_count}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section 1: DAG Operations -->
+            <div class="row mb-4">
                 <div class="col-12">
                     <div class="card">
-                        <div class="card-header bg-primary text-white">
-                            <h5><i class="fas fa-project-diagram"></i> DAG Dashboard Example</h5>
+                        <div class="card-header bg-info text-white">
+                            <h5><i class="fas fa-code"></i> 1. DAG Operations</h5>
                         </div>
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <h6>DAG Information</h6>
-                                    <table class="table table-sm">
-                                        <tr><td><strong>DAG ID:</strong></td><td>{dag_id}</td></tr>
-                                        <tr><td><strong>Node Count:</strong></td><td>{len(dag_nodes)}</td></tr>
-                                    </table>
+                                    <h6>Code Examples:</h6>
+                                    <pre class="bg-light p-3 rounded"><code># Get all node names in the DAG
+node_names = list(self.dag.keys())
+print(f"Found {{len(node_names)}} nodes")
+
+# Access a specific node
+node = self.dag[node_name]
+
+# Get the node's computed value
+value = node.value()
+
+# Analyze the value type
+value_type = type(value).__name__</code></pre>
                                 </div>
                                 <div class="col-md-6">
-                                    <h6>DAG Actions</h6>
-                                    <div class="d-grid gap-2">
-                                        <button class="btn btn-outline-primary btn-sm" onclick="alert('DAG action executed!')">
-                                            <i class="fas fa-play"></i> Execute DAG
-                                        </button>
-                                        <button class="btn btn-outline-secondary btn-sm" onclick="alert('DAG exported!')">
-                                            <i class="fas fa-download"></i> Export DAG
-                                        </button>
+                                    <h6>Results:</h6>
+                                    <div class="bg-success bg-opacity-10 p-3 rounded">
+                                        <strong>Node Names:</strong><br>
+                                        <code>{', '.join(node_names[:5])}{', ...' if len(node_names) > 5 else ''}</code>
+                                        <br><br>
+                                        <strong>Total Nodes:</strong> {node_count}
                                     </div>
                                 </div>
                             </div>
-                            <div class="row mt-3">
-                                <div class="col-12">
-                                    <div class="card">
-                                        <div class="card-header bg-light">
-                                            <h6><i class="fas fa-clock"></i> Time Demo</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="row">
-                                                <div class="col-md-6">
-                                                    <label for="multiplier" class="form-label">Time Multiplier:</label>
-                                                    <input type="number" class="form-control" id="multiplier" name="method_args" value="1" step="0.1" min="0">
-                                                </div>
-                                                <div class="col-md-6 d-flex align-items-end">
-                                                    <button class="btn btn-outline-info btn-sm" 
-                                                            hx-get="{self.method_call_url('show_time')}"
-                                                            hx-include="#multiplier"
-                                                            hx-target="#timeResult"
-                                                            hx-swap="innerHTML">
-                                                        <i class="fas fa-clock"></i> Show Time
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div id="timeResult" class="mt-3">
-                                                <!-- Results will appear here -->
-                                            </div>
-                                        </div>
+                            
+                            <h6 class="mt-4">Node Details Table:</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Node Name</th>
+                                            <th>Value Type</th>
+                                            <th>Value Preview</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {node_list_html}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section 2: Data Visualization -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h5><i class="fas fa-chart-line"></i> 2. Data Visualization</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Code Example:</h6>
+                                    <pre class="bg-light p-3 rounded"><code># Extract numeric values for visualization
+numeric_values = []
+for node_name in node_names:
+    node = self.dag[node_name]
+    value = node.value()
+    
+    if isinstance(value, (int, float)):
+        numeric_values.append({{
+            'name': node_name, 
+            'value': float(value)
+        }})
+    elif hasattr(value, '__len__'):
+        # Use length for collections
+        numeric_values.append({{
+            'name': f"{{node_name}} (length)", 
+            'value': len(value)
+        }})</code></pre>
+                                </div>
+                                <div class="col-md-6">
+                                    {chart_html}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section 3: Backend Operations -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5><i class="fas fa-server"></i> 3. Backend Operations</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Code Example:</h6>
+                                    <pre class="bg-light p-3 rounded"><code># Backend method with HTMX integration
+def analyze_dag_stats(self):
+    node_count = len(self.dag.keys())
+    total_size = 0
+    
+    for node_name in self.dag.keys():
+        try:
+            value = self.dag[node_name].value()
+            if hasattr(value, '__sizeof__'):
+                total_size += value.__sizeof__()
+        except Exception:
+            pass
+    
+    return analysis_html</code></pre>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Interactive Demo:</h6>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-success btn-sm" 
+                                                hx-get="{self.method_call_url('analyze_dag_stats')}"
+                                                hx-target="#dagStatsResult"
+                                                hx-swap="innerHTML">
+                                            <i class="fas fa-calculator"></i> Analyze DAG Statistics
+                                        </button>
+                                    </div>
+                                    
+                                    <div id="dagStatsResult" class="mt-3">
+                                        <!-- DAG stats will appear here -->
                                     </div>
                                 </div>
                             </div>
@@ -86,95 +251,99 @@ class ExampleDagPlugin(DagDashboardPlugin):
                 </div>
             </div>
         </div>
+        
+        <!-- Include HTMX for interactive features -->
+        <script src="https://unpkg.com/htmx.org@1.8.4"></script>
         """
         return html
 
-    def show_time(self, multiplier=1):
-        """An example of method calling that displays the current time."""
+    def analyze_dag_stats(self):
+        """Analyze DAG statistics including node types, values, and memory usage."""
         try:
-            multiplier = float(multiplier)
-            current_time = time() * multiplier
-            formatted_time = __import__('datetime').datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S')
+            node_names = list(self.dag.keys())
+            node_count = len(node_names)
             
-            return f"""<div class="alert alert-success">
-                <h6><i class="fas fa-clock"></i> Time Result</h6>
-                <p><strong>Multiplier:</strong> {multiplier}</p>
-                <p><strong>Timestamp:</strong> {current_time}</p>
-                <p><strong>Formatted Time:</strong> {formatted_time}</p>
-            </div>"""
+            # Analyze node values
+            value_types = {}
+            total_memory = 0
+            numeric_count = 0
+            string_count = 0
+            collection_count = 0
+            
+            for node_name in node_names:
+                try:
+                    node = self.dag[node_name]
+                    value = node.value()
+                    value_type = type(value).__name__
+                    
+                    # Count by type
+                    value_types[value_type] = value_types.get(value_type, 0) + 1
+                    
+                    # Memory estimation
+                    if hasattr(value, '__sizeof__'):
+                        total_memory += value.__sizeof__()
+                    
+                    # Category analysis
+                    if isinstance(value, (int, float)):
+                        numeric_count += 1
+                    elif isinstance(value, str):
+                        string_count += 1
+                    elif hasattr(value, '__len__'):
+                        collection_count += 1
+                        
+                except Exception:
+                    value_types['Error'] = value_types.get('Error', 0) + 1
+            
+            # Create type distribution chart
+            type_chart_html = ""
+            if value_types:
+                max_count = max(value_types.values())
+                for vtype, count in sorted(value_types.items(), key=lambda x: x[1], reverse=True):
+                    percentage = (count / max_count * 100) if max_count > 0 else 0
+                    type_chart_html += f"""
+                    <div class="d-flex align-items-center mb-2">
+                        <div style="width: 100px; font-size: 0.85em;">
+                            <code>{vtype}</code>
+                        </div>
+                        <div class="flex-grow-1 mx-2">
+                            <div class="progress" style="height: 18px;">
+                                <div class="progress-bar bg-primary" role="progressbar" 
+                                     style="width: {percentage}%" title="{count} nodes">
+                                </div>
+                            </div>
+                        </div>
+                        <div style="width: 40px; font-size: 0.85em;" class="text-end">
+                            <strong>{count}</strong>
+                        </div>
+                    </div>
+                    """
+            
+            return f"""
+            <div class="alert alert-info">
+                <h6><i class="fas fa-chart-pie"></i> DAG Analysis Results</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Summary Statistics:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Total Nodes:</strong> {node_count}</li>
+                            <li><strong>Numeric Values:</strong> {numeric_count}</li>
+                            <li><strong>String Values:</strong> {string_count}</li>
+                            <li><strong>Collections:</strong> {collection_count}</li>
+                            <li><strong>Est. Memory:</strong> {total_memory:,} bytes</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Value Type Distribution:</h6>
+                        {type_chart_html}
+                    </div>
+                </div>
+            </div>
+            """
         except Exception as e:
             return f"""<div class="alert alert-danger">
-                <h6><i class="fas fa-exclamation-triangle"></i> Error</h6>
-                <p>Failed to calculate time: {str(e)}</p>
+                <h6><i class="fas fa-exclamation-triangle"></i> Analysis Error</h6>
+                <p>Failed to analyze DAG: {str(e)}</p>
             </div>"""
-
-class DagStatsPlugin(DagDashboardPlugin):
-    """Shows detailed statistics about the DAG structure."""
-    NAME = "DAG Statistics"
-
-    def render(self):
-        dag_id = self.dag._ref.to if hasattr(self.dag, '_ref') else 'Unknown'
-        try:
-            dag_data = self.dml("dag", "describe", dag_id)
-            nodes = dag_data.get("nodes", [])
-            edges = dag_data.get("edges", [])
-            # Analyze node types
-            node_types = {}
-            for node in nodes:
-                node_type = node.get("node_type", "unknown")
-                node_types[node_type] = node_types.get(node_type, 0) + 1
-            # Create statistics
-            stats_html = ""
-            for node_type, count in node_types.items():
-                percentage = (count / len(nodes)) * 100 if nodes else 0
-                stats_html += f"""
-                <div class="row mb-2">
-                    <div class="col-4"><strong>{node_type.title()}:</strong></div>
-                    <div class="col-4">{count}</div>
-                    <div class="col-4">
-                        <div class="progress" style="height: 20px;">
-                            <div class="progress-bar" role="progressbar" style="width: {percentage}%">
-                                {percentage:.1f}%
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                """
-            html = f"""
-            <div class="container-fluid">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h5><i class="fas fa-chart-bar"></i> DAG Statistics</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-4 text-center">
-                                <h2 class="text-primary">{len(nodes)}</h2>
-                                <p class="text-muted">Total Nodes</p>
-                            </div>
-                            <div class="col-md-4 text-center">
-                                <h2 class="text-success">{len(edges)}</h2>
-                                <p class="text-muted">Total Edges</p>
-                            </div>
-                            <div class="col-md-4 text-center">
-                                <h2 class="text-warning">{len(node_types)}</h2>
-                                <p class="text-muted">Node Types</p>
-                            </div>
-                        </div>
-                        <h6>Node Type Distribution:</h6>
-                        {stats_html}
-                    </div>
-                </div>
-            </div>
-            """
-        except Exception as e:
-            html = f"""
-            <div class="alert alert-danger">
-                <h5>Error loading DAG statistics</h5>
-                <p>{str(e)}</p>
-            </div>
-            """
-        return html
 
 # Node Dashboard Plugins
 class ExampleNodePlugin(NodeDashboardPlugin):
@@ -240,92 +409,3 @@ class ExampleNodePlugin(NodeDashboardPlugin):
         </div>
         """
         return html
-
-class NodeDetailsPlugin(NodeDashboardPlugin):
-    """Shows detailed information about a node including dependencies."""
-    NAME = "Node Details"
-
-    def render(self):
-        node_id = self.node.ref.to if hasattr(self.node, 'ref') else 'Unknown'
-        try:
-            dag_data = self.dml("dag", "describe", self.node.dag._ref.to)
-            nodes = dag_data.get("nodes", [])
-            edges = dag_data.get("edges", [])
-            # Find current node
-            current_node = None
-            for n in nodes:
-                if n.get("id") == node_id:
-                    current_node = n
-                    break
-            if not current_node:
-                return f"""
-                <div class="alert alert-warning">
-                    <h5>Node not found</h5>
-                    <p>Node {node_id} was not found in DAG {self.node.dag._ref.to}</p>
-                </div>
-                """
-            # Find dependencies (incoming edges)
-            dependencies = []
-            dependents = []
-            for edge in edges:
-                if edge.get("target") == node_id:
-                    dependencies.append(edge.get("source"))
-                elif edge.get("source") == node_id:
-                    dependents.append(edge.get("target"))
-            dep_html = ""
-            if dependencies:
-                dep_html = "<ul>" + "".join([f"<li><code>{dep}</code></li>" for dep in dependencies]) + "</ul>"
-            else:
-                dep_html = "<p class='text-muted'>No dependencies</p>"
-            dependent_html = ""
-            if dependents:
-                dependent_html = "<ul>" + "".join([f"<li><code>{dep}</code></li>" for dep in dependents]) + "</ul>"
-            else:
-                dependent_html = "<p class='text-muted'>No dependents</p>"
-            html = f"""
-            <div class="container-fluid">
-                <div class="card">
-                    <div class="card-header bg-warning text-dark">
-                        <h5><i class="fas fa-info-circle"></i> Node Details</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <h6>Node Properties</h6>
-                                <table class="table table-sm">
-                                    <tr><td><strong>ID:</strong></td><td><code>{current_node.get('id', 'N/A')}</code></td></tr>
-                                    <tr><td><strong>Name:</strong></td><td>{current_node.get('name', 'N/A')}</td></tr>
-                                    <tr><td><strong>Type:</strong></td><td><span class="badge bg-primary">{current_node.get('node_type', 'N/A')}</span></td></tr>
-                                    <tr><td><strong>Data Type:</strong></td><td>{current_node.get('data_type', 'N/A')}</td></tr>
-                                </table>
-                            </div>
-                            <div class="col-md-4">
-                                <h6>Dependencies ({len(dependencies)})</h6>
-                                {dep_html}
-                            </div>
-                            <div class="col-md-4">
-                                <h6>Dependents ({len(dependents)})</h6>
-                                {dependent_html}
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-12">
-                                <h6>Documentation</h6>
-                                <div class="bg-light p-2 rounded">
-                                    {current_node.get('doc', 'No documentation available') or 'No documentation available'}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            """
-        except Exception as e:
-            html = f"""
-            <div class="alert alert-danger">
-                <h5>Error loading node details</h5>
-                <p>{str(e)}</p>
-            </div>
-            """
-        return html
-

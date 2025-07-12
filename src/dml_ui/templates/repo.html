@@ -1,0 +1,755 @@
+{% extends "layout.html" %}
+
+{% block title %}Repository - {{ repo }}{% endblock %}
+
+{% block extra_header %}
+<style>
+  .repo-header {
+    background: var(--bs-primary-bg-subtle);
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+  }
+  
+  .repo-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--bs-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .repo-title i {
+    color: var(--bs-primary);
+    font-size: 1.6rem;
+  }
+  
+  .branch-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  
+  .branch-badge {
+    background: var(--bs-success);
+    color: white;
+    padding: 0.3rem 0.8rem;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  
+  .commit-graph-container {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    margin-bottom: 2rem;
+    overflow: hidden;
+  }
+  
+  .graph-header {
+    background: var(--bs-primary-bg-subtle);
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+    margin: 0;
+  }
+  
+  .graph-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--bs-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .graph-content {
+    padding: 0;
+  }
+  
+  .commit-graph {
+    position: relative;
+    padding: 1rem;
+    overflow: auto;
+    min-height: 400px;
+    background: var(--bs-body-bg);
+  }
+  
+  .graph-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  .graph-svg circle {
+    pointer-events: all;
+    transition: all 0.2s ease;
+  }
+  
+  .graph-svg circle:hover {
+    stroke-width: 3;
+    filter: brightness(1.1);
+  }
+  
+  .commit-tooltip {
+    position: absolute;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+    min-width: 300px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  
+  .tooltip-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .tooltip-hash {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.8rem;
+    color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+  }
+  
+  .tooltip-head {
+    background: var(--bs-success);
+    color: white;
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  
+  .tooltip-message {
+    color: var(--bs-body-color);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+  }
+  
+  .tooltip-meta {
+    display: flex;
+    gap: 1rem;
+    color: var(--bs-secondary-color);
+    font-size: 0.8rem;
+  }
+  
+  .tooltip-author {
+    font-weight: 500;
+  }
+  
+  .tooltip-date {
+    font-family: var(--bs-font-monospace);
+  }
+  
+  @media (max-width: 768px) {
+    .repo-header {
+      padding: 1rem;
+    }
+    
+    .branch-selector {
+      justify-content: center;
+    }
+    
+    .commit-tooltip {
+      min-width: 250px;
+    }
+    
+    .commit-graph {
+      padding: 0.5rem;
+    }
+    
+    .tooltip-meta {
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+  }
+  
+  .head-indicator {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bs-warning);
+    color: var(--bs-dark);
+    padding: 0.2rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+  }
+  
+  .head-indicator.main {
+    background: var(--bs-success);
+    color: white;
+  }
+  
+  .head-indicator i {
+    margin-right: 0.2rem;
+    font-size: 0.6rem;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--bs-secondary-color);
+    font-style: italic;
+  }
+  
+  .empty-state i {
+    font-size: 2.5rem;
+    color: var(--bs-primary);
+    margin-bottom: 1rem;
+    display: block;
+  }
+  
+  .loading-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--bs-secondary-color);
+  }
+  
+  .loading-spinner {
+    border: 3px solid var(--bs-border-color);
+    border-top: 3px solid var(--bs-primary);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+
+<script>
+  let commitData = null;
+  
+  // Dolthub-inspired branch colors using CSS variables
+  const branchColors = [
+    '#0d6efd', // --bs-primary
+    '#198754', // --bs-success
+    '#fd7e14', // --bs-warning
+    '#dc3545', // --bs-danger
+    '#0dcaf0', // --bs-info
+    '#6f42c1', // --bs-purple
+    '#20c997', // --bs-teal
+    '#6c757d'  // --bs-secondary
+  ];
+  
+  function getBranchColor(branchIndex) {
+    return branchColors[branchIndex % branchColors.length];
+  }
+  
+  async function loadCommitGraph() {
+    const loadingElement = document.getElementById('loading-state');
+    const graphElement = document.getElementById('commit-graph');
+    
+    try {
+      // Show loading state
+      if (loadingElement) loadingElement.style.display = 'block';
+      if (graphElement) graphElement.style.display = 'none';
+      
+      // Make API call to get commit log
+      const repo = '{{ repo }}';
+      const response = await fetch(`/api/commit-log?repo=${encodeURIComponent(repo)}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch commit log');
+      }
+      
+      commitData = await response.json();
+      renderCommitGraph(commitData);
+      
+    } catch (error) {
+      console.error('Error loading commit graph:', error);
+      showErrorState();
+    } finally {
+      // Hide loading state
+      if (loadingElement) loadingElement.style.display = 'none';
+      if (graphElement) graphElement.style.display = 'block';
+    }
+  }
+  
+  function formatCommits(commits) {
+    // Build children map - Dolthub approach
+    const childrenMap = new Map();
+    commits.forEach(commit => {
+      if (commit.parents && commit.parents.length > 0) {
+        commit.parents.forEach(parentId => {
+          if (childrenMap.get(parentId)) {
+            childrenMap.get(parentId).push(commit.id);
+          } else {
+            childrenMap.set(parentId, [commit.id]);
+          }
+        });
+      }
+    });
+    
+    return commits.map((commit, index) => ({
+      hash: commit.id,
+      parents: commit.parents || [],
+      children: childrenMap.get(commit.id) || [],
+      author: commit.author,
+      message: commit.message,
+      created: commit.created,
+      branch: commit.head, // Track which branch this commit belongs to
+      commitColor: "",
+      x: -1,
+      y: index, // Row position is commit index (topological order)
+      isHead: commit.head !== null, // Any commit with a head is a head commit
+      isMerge: commit.parents && commit.parents.length > 1
+    }));
+  }
+  
+  function calculateCommitPositions(commits) {
+    const commitNodes = formatCommits(commits);
+    const commitMap = new Map();
+    commitNodes.forEach(node => commitMap.set(node.hash, node));
+    
+    // Track columns and branch information
+    const columns = [];
+    const branchColumns = new Map(); // Track which column each branch uses
+    let branchOrder = 0;
+    
+    // Process commits from HEAD to root (child to parent)
+    commitNodes.forEach(commit => {
+      const children = commit.children;
+      let commitCol = -1;
+      
+      // If this commit has a branch head, try to keep branch consistency
+      if (commit.branch && branchColumns.has(commit.branch)) {
+        const branchCol = branchColumns.get(commit.branch);
+        if (branchCol < columns.length) {
+          commitCol = branchCol;
+        }
+      }
+      
+      if (commitCol === -1) {
+        if (children.length === 0) {
+          // Head commit - create new column
+          columns.push([{
+            start: commit.y,
+            end: commit.y,
+            endCommitHash: commit.hash,
+            branchOrder: branchOrder++,
+            branch: commit.branch
+          }]);
+          commitCol = columns.length - 1;
+          
+          // Track this branch's column
+          if (commit.branch) {
+            branchColumns.set(commit.branch, commitCol);
+          }
+        } else {
+          // Categorize children into branch and merge children
+          const branchChildren = [];
+          const mergeChildren = [];
+          
+          children.forEach(childHash => {
+            const child = commitMap.get(childHash);
+            if (child && child.parents.length > 1) {
+              // Child is a merge commit
+              const parentIndex = child.parents.indexOf(commit.hash);
+              if (parentIndex === 0) {
+                branchChildren.push(childHash); // Main parent
+              } else {
+                mergeChildren.push(childHash); // Merged parent
+              }
+            } else {
+              branchChildren.push(childHash); // Regular branch child
+            }
+          });
+          
+          if (branchChildren.length > 0) {
+            // Place in leftmost branch child's column
+            const branchChildrenCols = branchChildren
+              .map(childHash => commitMap.get(childHash)?.x)
+              .filter(col => col !== undefined);
+            
+            if (branchChildrenCols.length > 0) {
+              commitCol = Math.min(...branchChildrenCols);
+            }
+          }
+          
+          if (commitCol === -1 && mergeChildren.length > 0) {
+            // No branch children, but has merge children - create new column
+            const childCols = children
+              .map(childHash => commitMap.get(childHash)?.x)
+              .filter(col => col !== undefined);
+            
+            if (childCols.length > 0) {
+              const maxChildCol = Math.max(...childCols);
+              const minChildRow = Math.min(...children.map(childHash => commitMap.get(childHash)?.y || 0));
+              
+              // Find available column starting from maxChildCol + 1
+              const colFitAtEnd = columns.slice(maxChildCol + 1).findIndex((column) => {
+                return minChildRow >= column[column.length - 1].end;
+              });
+              
+              const col = colFitAtEnd === -1 ? -1 : maxChildCol + 1 + colFitAtEnd;
+              
+              if (col === -1) {
+                // No available column found, create new one
+                columns.push([{
+                  start: minChildRow + 1,
+                  end: commit.y,
+                  endCommitHash: commit.hash,
+                  branchOrder: branchOrder++,
+                  branch: commit.branch
+                }]);
+                commitCol = columns.length - 1;
+              } else {
+                commitCol = col;
+                columns[col].push({
+                  start: minChildRow + 1,
+                  end: commit.y,
+                  endCommitHash: commit.hash,
+                  branchOrder: branchOrder++,
+                  branch: commit.branch
+                });
+              }
+            }
+          }
+          
+          if (commitCol === -1) {
+            // Fallback - create new column
+            columns.push([{
+              start: commit.y,
+              end: commit.y,
+              endCommitHash: commit.hash,
+              branchOrder: branchOrder++,
+              branch: commit.branch
+            }]);
+            commitCol = columns.length - 1;
+          }
+        }
+      } else {
+        // Extend existing column for this branch
+        const lastSegment = columns[commitCol][columns[commitCol].length - 1];
+        if (lastSegment && commit.y > lastSegment.end) {
+          lastSegment.end = commit.y;
+          lastSegment.endCommitHash = commit.hash;
+        }
+      }
+      
+      // Assign position and color
+      commit.x = commitCol;
+      const branchIndex = columns[commitCol]?.[columns[commitCol].length - 1]?.branchOrder || 0;
+      commit.commitColor = getBranchColor(branchIndex);
+      commit.branchIndex = branchIndex;
+    });
+    
+    return { commits: commitNodes, columns, maxWidth: columns.length };
+  }
+  
+  function renderCommitGraph(commits) {
+    const graphElement = document.getElementById('commit-graph');
+    if (!graphElement || !commits || commits.length === 0) {
+      showEmptyState();
+      return;
+    }
+    
+    // Clear existing content
+    graphElement.innerHTML = '';
+    
+    // Calculate positions using Dolthub algorithm
+    const { commits: processedCommits, columns, maxWidth } = calculateCommitPositions(commits);
+    
+    // Graph layout constants
+    const commitSpacing = 60; // Vertical spacing
+    const nodeRadius = 4; // Smaller, cleaner circles
+    const columnWidth = 40; // Horizontal spacing
+    const paddingLeft = 30;
+    const paddingTop = 30;
+    
+    // Calculate dimensions
+    const totalHeight = Math.max(400, processedCommits.length * commitSpacing + paddingTop * 2);
+    const totalWidth = Math.max(400, maxWidth * columnWidth + paddingLeft * 2);
+    
+    graphElement.style.height = `${totalHeight}px`;
+    graphElement.style.width = `${totalWidth}px`;
+     // Create SVG for paths
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', totalWidth);
+    svg.setAttribute('height', totalHeight);
+    svg.classList.add('graph-svg');
+    graphElement.appendChild(svg);
+
+    // Draw curves for parent-child connections
+    processedCommits.forEach(commit => {
+      const commitX = paddingLeft + commit.x * columnWidth;
+      const commitY = paddingTop + commit.y * commitSpacing;
+      
+      commit.parents.forEach(parentHash => {
+        const parent = processedCommits.find(c => c.hash === parentHash);
+        if (parent) {
+          const parentX = paddingLeft + parent.x * columnWidth;
+          const parentY = paddingTop + parent.y * commitSpacing;
+          
+          // Draw curve for all parent-child connections (both same column and different columns)
+          if (parent.x !== commit.x) {
+            // Different columns - draw curved connection
+            const path = createCurvePath([commitX, commitY], [parentX, parentY]);
+            const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            pathElement.setAttribute('d', path);
+            pathElement.setAttribute('stroke', commit.commitColor);
+            pathElement.setAttribute('stroke-width', '2');
+            pathElement.setAttribute('fill', 'none');
+            pathElement.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(pathElement);
+          } else {
+            // Same column - draw straight line
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', commitX);
+            line.setAttribute('y1', commitY);
+            line.setAttribute('x2', parentX);
+            line.setAttribute('y2', parentY);
+            line.setAttribute('stroke', commit.commitColor);
+            line.setAttribute('stroke-width', '2');
+            line.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(line);
+          }
+        }
+      });
+    });
+    
+    // Draw commit dots
+    processedCommits.forEach(commit => {
+      const x = paddingLeft + commit.x * columnWidth;
+      const y = paddingTop + commit.y * commitSpacing;
+      
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', x);
+      circle.setAttribute('cy', y);
+      circle.setAttribute('r', nodeRadius);
+      circle.setAttribute('fill', commit.commitColor);
+      circle.setAttribute('stroke', 'white');
+      circle.setAttribute('stroke-width', '1.5');
+      circle.style.cursor = 'pointer';
+      circle.onclick = () => navigateToCommit(commit.hash, commit.branch, commit.isHead);
+      svg.appendChild(circle);
+      
+      // Create tooltip
+      const tooltip = createCommitTooltip(commit, x + 25, y);
+      graphElement.appendChild(tooltip);
+      
+      // Show/hide tooltip on hover
+      circle.onmouseenter = () => tooltip.style.opacity = '1';
+      circle.onmouseleave = () => tooltip.style.opacity = '0';
+    });
+  }
+  
+  // Dolthub curve path function
+  function createCurvePath(start, end) {
+    const cx1 = start[0] * 0.1 + end[0] * 0.9;
+    const cy1 = start[1] * 0.6 + end[1] * 0.4;
+    const cx2 = start[0] * 0.03 + end[0] * 0.97;
+    const cy2 = start[1] * 0.4 + end[1] * 0.6;
+    
+    return `M ${start[0]} ${start[1]} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${end[0]} ${end[1]}`;
+  }
+  
+  
+  function createCommitTooltip(commit, x, y) {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'commit-tooltip';
+    tooltip.style.left = `${x}px`;
+    tooltip.style.top = `${y}px`;
+    tooltip.style.transform = 'translateY(-50%)';
+    tooltip.style.opacity = '0';
+    tooltip.style.transition = 'opacity 0.2s ease';
+    
+    const header = document.createElement('div');
+    header.className = 'tooltip-header';
+    
+    const hash = document.createElement('span');
+    hash.className = 'tooltip-hash';
+    hash.textContent = commit.hash.substring(0, 12);
+    header.appendChild(hash);
+    
+    if (commit.isHead) {
+      const headBadge = document.createElement('span');
+      headBadge.className = 'tooltip-head';
+      headBadge.textContent = `HEAD (${commit.branch || 'unknown'})`;
+      header.appendChild(headBadge);
+    } else if (commit.branch) {
+      const branchBadge = document.createElement('span');
+      branchBadge.className = 'tooltip-head';
+      branchBadge.style.background = 'var(--bs-info)';
+      branchBadge.style.color = 'white';
+      branchBadge.textContent = commit.branch;
+      header.appendChild(branchBadge);
+    }
+    
+    if (commit.isMerge) {
+      const mergeBadge = document.createElement('span');
+      mergeBadge.className = 'tooltip-head';
+      mergeBadge.style.background = 'var(--bs-warning)';
+      mergeBadge.style.color = 'var(--bs-dark)';
+      mergeBadge.textContent = 'MERGE';
+      header.appendChild(mergeBadge);
+    }
+    
+    const message = document.createElement('div');
+    message.className = 'tooltip-message';
+    message.textContent = commit.message || 'No commit message';
+    
+    const meta = document.createElement('div');
+    meta.className = 'tooltip-meta';
+    
+    const author = document.createElement('span');
+    author.className = 'tooltip-author';
+    author.textContent = commit.author || 'Unknown';
+    
+    const date = document.createElement('span');
+    date.className = 'tooltip-date';
+    date.textContent = formatCommitDate(commit.created);
+    
+    if (commit.parents && commit.parents.length > 0) {
+      const parents = document.createElement('span');
+      parents.className = 'tooltip-parents';
+      parents.style.fontSize = '0.7rem';
+      parents.style.color = 'var(--bs-secondary-color)';
+      parents.textContent = `Parents: ${commit.parents.length}`;
+      meta.appendChild(parents);
+    }
+    
+    meta.appendChild(author);
+    meta.appendChild(date);
+    
+    tooltip.appendChild(header);
+    tooltip.appendChild(message);
+    tooltip.appendChild(meta);
+    
+    return tooltip;
+  }
+  
+  function formatCommitDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  }
+  
+  function navigateToCommit(commitId, commitBranch, isHead) {
+    const repo = '{{ repo }}';
+    // Only HEAD commits should include the branch in the URL
+    // Other commits should link by commit ID only for more direct access
+    if (isHead && commitBranch) {
+      window.location.href = `/commit?repo=${encodeURIComponent(repo)}&branch=${encodeURIComponent(commitBranch)}&commit_id=${encodeURIComponent(commitId)}`;
+    } else {
+      window.location.href = `/commit?repo=${encodeURIComponent(repo)}&commit_id=${encodeURIComponent(commitId)}`;
+    }
+  }
+  
+  function showEmptyState() {
+    const graphElement = document.getElementById('commit-graph');
+    if (graphElement) {
+      graphElement.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-code-branch"></i>
+          <div>No commits found in this repository</div>
+          <small>The repository might be empty or there might be an issue loading the commit history.</small>
+        </div>
+      `;
+    }
+  }
+  
+  function showErrorState() {
+    const graphElement = document.getElementById('commit-graph');
+    if (graphElement) {
+      graphElement.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-exclamation-triangle"></i>
+          <div>Failed to load commit history</div>
+          <small>Please check your repository and try again.</small>
+        </div>
+      `;
+    }
+  }
+  
+  // Load commit graph when page loads
+  document.addEventListener('DOMContentLoaded', function() {
+    loadCommitGraph();
+  });
+</script>
+{% endblock %}
+
+{% block content %}
+  <!-- Repository Header -->
+  <div class="repo-header">
+    <h1 class="repo-title">
+      <i class="fas fa-code-branch"></i>
+      {{ repo }}
+    </h1>
+    <div class="branch-selector">
+      {% if branch %}
+      <span class="branch-badge">
+        <i class="fas fa-code-branch"></i>
+        {{ branch }}
+      </span>
+      {% else %}
+      <span class="branch-badge" style="background: var(--bs-secondary);">
+        <i class="fas fa-code-branch"></i>
+        All Branches
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Commit Graph -->
+  <div class="commit-graph-container">
+    <div class="graph-header">
+      <h2 class="graph-title">
+        <i class="fas fa-project-diagram"></i>
+        Commit History
+      </h2>
+    </div>
+    <div class="graph-content">
+      <!-- Loading State -->
+      <div id="loading-state" class="loading-state" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div>Loading commit history...</div>
+      </div>
+      
+      <!-- Commit Graph -->
+      <div id="commit-graph" class="commit-graph">
+        <!-- Commits will be populated by JavaScript -->
+      </div>
+    </div>
+  </div>
+{% endblock %}

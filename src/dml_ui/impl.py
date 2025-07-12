@@ -15,31 +15,30 @@ app = Flask(__name__)
 def get_breadcrumbs(repo, branch, dag_id=None, commit_id=None):
     """Generate breadcrumb navigation data"""
     breadcrumbs = []
-    # breadcrumbs.append({"name": "dml", "url": url_for("main"), "icon": "fas fa-coins"})
     if repo:
         breadcrumbs.append({
             "name": repo,
-            "url": url_for("main", repo=repo),
+            "url": url_for("repo_route", repo=repo),
             "icon": "fa fa-star-of-david",
         })
         if branch:
             breadcrumbs.append({
                 "name": branch,
-                "url": url_for("main", repo=repo, branch=branch),
+                "url": url_for("commit_route", repo=repo, branch=branch),
                 "icon": "fa fa-code-branch",
             })
-            if commit_id:
-                breadcrumbs.append({
-                    "name": commit_id.split("/")[-1][:8],
-                    "url": url_for("commit_route", repo=repo, branch=branch, commit_id=commit_id),
-                    "icon": "fa fa-code-commit",  # "fas fa-umbrella"
-                })
-            if dag_id:
-                breadcrumbs.append({
-                    "name": dag_id[0] + ":" + dag_id.split("/")[-1][:8],
-                    "url": url_for("dag_route", repo=repo, branch=branch, dag_id=dag_id),
-                    "icon": "fa fa-project-diagram",
-                })
+        if commit_id:
+            breadcrumbs.append({
+                "name": commit_id.split("/")[-1][:8],
+                "url": url_for("commit_route", repo=repo, commit_id=commit_id),
+                "icon": "fa fa-code-commit",  # "fas fa-umbrella"
+            })
+        if dag_id:
+            breadcrumbs.append({
+                "name": "DAG " + dag_id.split("/")[-1][:12],
+                "url": url_for("dag_route", repo=repo, dag_id=dag_id),
+                "icon": "fa fa-project-diagram",
+            })
     return breadcrumbs
 
 def get_sidebar_data(dml, repo, branch, dag_id=None):
@@ -57,7 +56,7 @@ def get_sidebar_data(dml, repo, branch, dag_id=None):
             is_current = repo == repo_item["name"]
             repo_section["items"].append({
                 "name": repo_item["name"],
-                "url": url_for("main", repo=repo_item["name"]),
+                "url": url_for("repo_route", repo=repo_item["name"]),
                 "icon": "fa fa-star-of-david",
                 "type": "repo",
                 "active": is_current
@@ -80,7 +79,7 @@ def get_sidebar_data(dml, repo, branch, dag_id=None):
                 is_current = branch == branch_name
                 branch_section['items'].append({
                     'name': branch_name,
-                    'url': url_for('main', repo=repo, branch=branch_name),
+                    'url': url_for('commit_route', repo=repo, branch=branch_name),
                     'icon': 'fa fa-code-branch',
                     'type': 'branch',
                     'active': is_current
@@ -126,7 +125,34 @@ def commit_route():
     repo = request.args.get("repo")
     branch = request.args.get("branch")
     commit_id = request.args.get("commit_id")
+    
+    # If no branch is provided but we have a commit_id, we need to find a branch that contains it
+    # This is for non-HEAD commits that are accessed directly by commit ID
+    if not branch and commit_id and repo:
+        try:
+            # Create a DML instance without branch to query branches
+            temp_dml = Dml(repo=repo)
+            # Try to find which branch contains this commit
+            branches_result = temp_dml("branch", "list")
+            if branches_result and "branches" in branches_result:
+                # Try each branch to see if it contains the commit
+                for branch_name in branches_result["branches"]:
+                    try:
+                        branch_dml = Dml(repo=repo, branch=branch_name)
+                        commit_data = branch_dml("commit", "describe", commit_id)
+                        if commit_data:
+                            # Found the commit in this branch, use it
+                            branch = branch_name
+                            break
+                    except Exception:
+                        # Commit not in this branch, try next
+                        continue
+        except Exception as e:
+            logger.error(f"Failed to find branch for commit {commit_id}: {e}")
+    
+    # Create DML instance with the determined branch (or None if not found)
     dml = Dml(repo=repo, branch=branch)
+    
     # Get commit data
     try:
         if commit_id:
@@ -138,6 +164,7 @@ def commit_route():
     except Exception as e:
         logger.error(f"Failed to get commit data: {e}")
         commit_data = None
+    
     # Generate breadcrumbs and sidebar
     breadcrumbs = get_breadcrumbs(repo, branch, commit_id=commit_id)
     sidebar = get_sidebar_data(dml, repo, branch)
@@ -199,6 +226,10 @@ def main():
     if repo and branch:
         from flask import redirect
         return redirect(url_for("commit_route", repo=repo, branch=branch))
+    # If only repo is selected, redirect to repo page
+    elif repo:
+        from flask import redirect
+        return redirect(url_for("repo_route", repo=repo))
     dml = Dml(repo=repo, branch=branch)
     breadcrumbs = get_breadcrumbs(repo, branch)
     sidebar = get_sidebar_data(dml, repo, branch)
@@ -338,11 +369,73 @@ def api_dashboard_content(kind, plugin_id):
         plugin_cls = discover_dashboard_plugins(kind).get(plugin_id)
         if not plugin_cls:
             return f"<div style='text-align: center; padding: 50px;'><h3>{kind.capitalize()} Plugin '{plugin_id}' not found</h3></div>", 404
+        
         kw = request.args.to_dict()
         method = kw.pop("method", None)
         kw.pop("method_args", None)  # Remove method_args if present
+        # Remove VS Code specific parameters that shouldn't be passed to plugins
+        kw.pop("id", None)
+        kw.pop("vscodeBrowserReqId", None)
         # Get method_args as a list, even if there's only one value
         method_args = request.args.getlist("method_args")
+        
+        # Handle missing branch parameter for plugins (similar to commit route)
+        repo = kw.get("repo")
+        branch = kw.get("branch")
+        dag_id = kw.get("dag_id")
+        
+        if not branch and repo and dag_id:
+            logger.info(f"No branch provided for plugin, trying to find branch for DAG {dag_id} in repo {repo}")
+            try:
+                # Create a DML instance without branch to query branches
+                temp_dml = Dml(repo=repo)
+                # Try to find which branch contains this DAG
+                branches_result = temp_dml("branch", "list")
+                logger.info(f"Available branches result: {branches_result}")
+                if branches_result and "branches" in branches_result and branches_result["branches"]:
+                    # Try each branch to see if it contains the DAG
+                    for branch_name in branches_result["branches"]:
+                        try:
+                            logger.info(f"Trying branch: {branch_name}")
+                            branch_dml = Dml(repo=repo, branch=branch_name)
+                            # Try to load the DAG to see if it exists in this branch
+                            dag_data = branch_dml("dag", "describe", dag_id)
+                            if dag_data:
+                                # Found the DAG in this branch, use it
+                                logger.info(f"Found DAG {dag_id} in branch {branch_name}")
+                                branch = branch_name
+                                kw["branch"] = branch
+                                break
+                        except Exception as e:
+                            # DAG not in this branch, try next
+                            logger.info(f"DAG {dag_id} not found in branch {branch_name}: {e}")
+                            continue
+                    
+                    # If we still don't have a branch, use the first available branch as fallback
+                    if not branch:
+                        logger.warning(f"Could not find branch containing DAG {dag_id}, using first available branch as fallback")
+                        branch = branches_result["branches"][0]
+                        kw["branch"] = branch
+                        logger.info(f"Using fallback branch: {branch}")
+                else:
+                    logger.warning(f"No branches found in repository {repo}, using 'main' as fallback")
+                    # Ultimate fallback - use "main" if no branches can be listed
+                    branch = "main"
+                    kw["branch"] = branch
+                    logger.info(f"Using ultimate fallback branch: {branch}")
+            except Exception as e:
+                logger.error(f"Failed to find branch for DAG {dag_id}: {e}")
+                # Ultimate fallback - use "main" if all else fails
+                if not branch:
+                    branch = "main"
+                    kw["branch"] = branch
+                    logger.info(f"Exception fallback, using branch: {branch}")
+        
+        # Final safety check - ensure we always have a branch
+        if not kw.get("branch"):
+            kw["branch"] = "main"
+            logger.info("Final safety fallback, using branch: main")
+        
         plugin_instance = plugin_cls(**kw)
         if method:
             # If a method is specified, call it with the provided arguments and return the result
@@ -400,6 +493,49 @@ def api_dashboard_content(kind, plugin_id):
         </div>
         """
         return rendered_content, 500
+
+@app.route("/repo")
+def repo_route():
+    repo = request.args.get("repo")
+    branch = request.args.get("branch")  # Optional for repo view
+    if not repo:
+        return "Repository is required", 400
+    
+    # For repo view, we don't need a specific branch context
+    dml = Dml(repo=repo) if not branch else Dml(repo=repo, branch=branch)
+    breadcrumbs = get_breadcrumbs(repo, branch)
+    sidebar = get_sidebar_data(dml, repo, branch)
+    
+    return render_template(
+        "repo.html",
+        repo=repo,
+        branch=branch,
+        breadcrumbs=breadcrumbs,
+        sidebar=sidebar,
+    )
+
+@app.route("/api/commit-log", methods=["GET"])
+def get_commit_log():
+    """
+    Get commit log for repository visualization.
+    
+    Query Parameters:
+    - repo: Repository name
+    """
+    repo = request.args.get("repo")
+    
+    if not repo:
+        return jsonify({"error": "Repository is required"}), 400
+    
+    try:
+        # We create Dml with repo only to get all commits from all branches
+        dml = Dml(repo=repo)
+        # Call dml commit log with JSON output to get all commits
+        commits = dml("commit", "log", "--output", "json")
+        return jsonify(commits)
+    except Exception as e:
+        logger.error(f"Failed to get commit log: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.errorhandler(404)
 def page_not_found(error):
