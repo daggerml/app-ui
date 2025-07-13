@@ -1277,7 +1277,7 @@
     </div>
     <div class="tab-pane fade" id="result" role="tabpanel" aria-labelledby="result-tab">
       <div class="container-fluid">
-        <div class="card code-container">
+        <div class="card code-container" id="resultCard">
           <div class="card-header">
             <h5 class="card-title mb-0">Result</h5>
           </div>
@@ -1615,8 +1615,8 @@
     const tabMap = {
       'code-tab-container': data.script,
       'logs-tab-container': data.log_streams && Object.keys(data.log_streams).length > 0,
-      'error-tab-container': data.error,
-      'result-tab-container': data.result,
+      'error-tab-container': false, // Remove separate error tab - errors are shown in result tab
+      'result-tab-container': true, // Always show result tab so we can debug what's available
       'html-tab-container': data.html_uri
     };
     
@@ -1633,10 +1633,13 @@
    * 
    * This function fills in the content areas for each tab type based on the
    * available data, formatting code blocks and error messages appropriately.
+   * When there's an error, the result tab displays the error information 
+   * including stack trace instead of execution results.
    * 
    * @param {Object} data - The DAG data object
    * @param {string} data.script - Python script content for syntax highlighting
-   * @param {string} data.error - Error message and stack trace
+   * @param {string} data.error - Error message for display
+   * @param {string} data.stack_trace - Stack trace information when there's an error
    * @param {*} data.result - DAG execution result to be displayed
    */
   function populateTabContent(data) {
@@ -1646,16 +1649,42 @@
         <pre class="mb-0"><code class="language-python">${data.script}</code></pre>
       `;
     }
-    // Error tab
-    if (data.error) {
-      document.getElementById('errorContent').innerHTML = `
-        <pre><code class="language-python">${data.error}</code></pre>
-      `;
-    }
-    // Result tab
+    // Result tab - show either result or error information
     if (data.result) {
+      // Update tab label and header for results
+      document.getElementById('result-tab').textContent = 'Result';
+      document.querySelector('#result .card-title').textContent = 'Result';
       document.getElementById('resultContent').innerHTML = `
         <pre class="mb-0"><code class="language-python">${data.result}</code></pre>
+      `;
+    } else if (data.error) {
+      // Update tab label and header for errors
+      document.getElementById('result-tab').textContent = 'Error';
+      // Display error information in the result tab
+      let errorContent = `<div class="alert alert-danger" role="alert">
+        <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Execution Error</h6>
+        <div class="mb-3">
+          <pre class="mt-2 mb-0"><code class="language-python">${data.error}</code></pre>
+        </div>`;
+      
+      errorContent += '</div>';
+      document.querySelector('#resultCard').innerHTML = errorContent;
+
+      // document.getElementById('resultContent').innerHTML = errorContent;
+    } else {
+      // Reset to default state when no result or error data
+      document.getElementById('result-tab').textContent = 'Result';
+      document.querySelector('#result .card-title').textContent = 'Result';
+      
+      // Show debug information temporarily to help diagnose the issue
+      document.getElementById('resultContent').innerHTML = `
+        <div class="text-center p-4 text-muted">
+          <i class="fas fa-info-circle fs-1 mb-3"></i>
+          <p>No result or error information available for this DAG.</p>
+          <div class="mt-3 text-start">
+            <small class="text-muted">Debug: Available data keys: ${Object.keys(data).join(', ')}</small>
+          </div>
+        </div>
       `;
     }
     // Initialize log state for logs tab
@@ -1666,6 +1695,12 @@
       }
       populateLogsTab(data.log_streams);
     }
+    
+    // Debug: Show what data is available
+    console.log('DEBUG: Available data keys:', Object.keys(data));
+    console.log('DEBUG: data.result:', data.result);
+    console.log('DEBUG: data.error:', data.error);
+    console.log('DEBUG: data.stack_trace:', data.stack_trace);
   }
 
   // Function to populate logs tab with modern design

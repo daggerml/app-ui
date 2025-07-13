@@ -146,7 +146,7 @@
       </li>
       {% endif %}
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="plugins-tab" data-bs-toggle="tab" data-bs-target="#plugins" type="button" role="tab" aria-controls="plugins" aria-selected="false">Plugins</button>
+        <button class="nav-link" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="false">Dashboard</button>
       </li>
     </ul>
     
@@ -329,15 +329,15 @@
       </div>
       {% endif %}
       
-      <!-- Plugins Tab -->
-      <div class="tab-pane fade" id="plugins" role="tabpanel" aria-labelledby="plugins-tab">
+      <!-- Dashboard Tab -->
+      <div class="tab-pane fade" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
         <div class="container-fluid">
           <div class="card">
             <div class="card-header">
               <div class="d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
                   <i class="fas fa-plug me-2"></i>
-                  Plugins
+                  Dashboard
                 </h5>
                 <div class="dropdown">
                   <button class="btn btn-outline-primary dropdown-toggle" type="button" id="plugin-selector" data-bs-toggle="dropdown" aria-expanded="false">
@@ -374,8 +374,8 @@
       const pluginSelector = document.getElementById('plugin-selector');
       const pluginContainer = document.getElementById('plugin-container');
       
-      // Load available plugins when plugins tab is first clicked
-      document.getElementById('plugins-tab').addEventListener('click', function() {
+      // Load available plugins when dashboard tab is first clicked
+      document.getElementById('dashboard-tab').addEventListener('click', function() {
         if (!this.dataset.pluginsLoaded) {
           loadPlugins();
           this.dataset.pluginsLoaded = 'true';
