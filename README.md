@@ -21,3 +21,11 @@ pip install dml-ui
 `dml-ui` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
 
 TODO: Finish plugins and create pypi package.
+
+## Overview
+
+This site is mostly vibe coded. You'll notice some nonsensical logic internally
+because of this. If you're trying to implement new functionality, I suggest
+using an LLM to understand the logic and flow. If you want to build a robust UI,
+I suggest starting from scratch (maybe just grepping this repo for whatever bits
+you find useful).
