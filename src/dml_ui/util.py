@@ -127,57 +127,30 @@ def get_dag_info(dml, dag_id, prune=False):
     
     # Process DAG result node if available
     # Extract result, error, and stack trace information
-    for key in ["result"]:
-        if dag_data.get(key) is not None:
-            print(f"DEBUG: Processing result node {dag_data[key]}")
-            tmp = get_node_repr(dag, dag_data[key])
-            print(f"DEBUG: Result node repr keys: {list(tmp.keys())}")
-            # Extract individual components
-            for field in ["value", "stack_trace", "script", "html_uri"]:
-                if tmp.get(field) is not None:
-                    if field == "value":
-                        # The result value is stored under the "result" key
-                        if tmp.get("stack_trace"):
-                            # If there's a stack trace, this indicates an error
-                            out["error"] = tmp["value"]
-                            out["stack_trace"] = tmp["stack_trace"]
-                            print("DEBUG: Found error in result node")
-                        else:
-                            # No stack trace means this is a successful result
-                            out["result"] = tmp["value"]
-                            print("DEBUG: Found successful result")
-                    else:
-                        out[field] = tmp[field]
-    
-    # If no result node exists, check if any nodes have errors
-    if "result" not in out and "error" not in out:
-        print("DEBUG: No result found, scanning all nodes for errors...")
-        for node in dag_data.get("nodes", []):
-            try:
-                node_value = dag[node["id"]].value()
-                if isinstance(node_value, Error):
-                    print(f"DEBUG: Found error in node {node['id']}")
-                    # Found an error node
-                    tmp = get_node_repr(dag, node["id"])
+    if dag_data.get("result") is not None:
+        val = dag_data["result"]
+        print(f"DEBUG: Processing result node {val}")
+        tmp = get_node_repr(dag, val)
+        print(f"DEBUG: Result node repr keys: {list(tmp.keys())}")
+        # Extract individual components
+        for field in ["value", "stack_trace", "script", "html_uri"]:
+            if tmp.get(field) is not None:
+                if field == "value":
+                    # The result value is stored under the "result" key
                     if tmp.get("stack_trace"):
+                        # If there's a stack trace, this indicates an error
                         out["error"] = tmp["value"]
                         out["stack_trace"] = tmp["stack_trace"]
-                        print(f"DEBUG: Using error from node {node['id']}")
-                        break  # Use the first error found
-            except Exception as e:
-                print(f"DEBUG: Could not evaluate node {node.get('id', 'unknown')}: {e}")
-                continue  # Skip nodes that can't be evaluated
-    
-    # Final check - if still no error/result found, add debug information
-    if "result" not in out and "error" not in out:
-        print("DEBUG: Still no result/error found, checking DAG structure...")
-        # Check if DAG description has any error information
-        if dag_data.get("error"):
-            out["error"] = str(dag_data["error"])
-            print(f"DEBUG: Found error in DAG description: {out['error']}")
-        # As a last resort, provide debug information
-        else:
-            print("DEBUG: No error information found anywhere")
+                        print("DEBUG: Found error in result node")
+                    else:
+                        # No stack trace means this is a successful result
+                        out["result"] = tmp["value"]
+                        print("DEBUG: Found successful result")
+                else:
+                    out[field] = tmp[field]
+    if dag_data.get("error"):
+        out["error"] = str(dag_data["error"])
+        print(f"DEBUG: Found error in DAG description: {out['error']}")
     
     print(f"DEBUG: Final out keys: {list(out.keys())}")
     try:

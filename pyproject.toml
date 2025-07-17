@@ -72,9 +72,9 @@ artifacts = [
 extra-dependencies = [
   "mypy>=1.0.0",
   # github dependencies on branch: "main" with features: dml,nb,app,test
-  "dml-util[nb,test] @ git+https://github.com/daggerml/dml-util.git@simplify-tests",
-  "daggerml @ git+https://github.com/daggerml/daggerml.git@fixed-annoying-keys-issue",
-  "daggerml_cli @ git+https://github.com/daggerml/daggerml-cli.git@fixed-annoying-keys-issue",
+  "dml-util[nb,test] @ git+https://github.com/daggerml/dml-util.git",
+  "daggerml @ git+https://github.com/daggerml/python-lib.git",
+  "daggerml_cli @ git+https://github.com/daggerml/daggerml-cli.git",
 ]
 [tool.hatch.envs.default.scripts]
 check = "mypy --install-types --non-interactive {args:src/dml_ui tests}"
